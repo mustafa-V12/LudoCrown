@@ -12,3 +12,4 @@ appsettings.*.local.json
 *.mobileprovision
 .env
 secrets/
+node_modules/

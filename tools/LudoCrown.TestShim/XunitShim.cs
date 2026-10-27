@@ -88,6 +88,11 @@ namespace Xunit
             if (actual is null || !actual.Contains(expected, StringComparison.Ordinal)) Fail($"\"{expected}\" not found in \"{actual}\"");
         }
 
+        public static void StartsWith(string expected, string? actual)
+        {
+            if (actual is null || !actual.StartsWith(expected, StringComparison.Ordinal)) Fail($"\"{actual}\" does not start with \"{expected}\"");
+        }
+
         public static void DoesNotContain<T>(IEnumerable<T> collection, Predicate<T> filter)
         {
             if (collection.Any(x => filter(x))) Fail("An item matched the filter");

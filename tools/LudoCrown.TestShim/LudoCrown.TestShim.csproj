@@ -12,11 +12,14 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\..\tests\LudoCrown.Core.Tests\**\*.cs" Exclude="..\..\tests\LudoCrown.Core.Tests\obj\**;..\..\tests\LudoCrown.Core.Tests\bin\**" LinkBase="Core.Tests" />
+    <Compile Include="..\..\tests\LudoCrown.Server.Tests\**\*.cs" Exclude="..\..\tests\LudoCrown.Server.Tests\obj\**;..\..\tests\LudoCrown.Server.Tests\bin\**" LinkBase="Server.Tests" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="..\..\src\LudoCrown.Core\LudoCrown.Core.csproj" />
+    <ProjectReference Include="..\..\src\LudoCrown.Server\LudoCrown.Server.csproj" />
   </ItemGroup>
 </Project>

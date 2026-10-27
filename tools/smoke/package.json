@@ -1,0 +1,8 @@
+{
+  "name": "ludocrown-smoke",
+  "private": true,
+  "description": "End-to-end smoke test: two guest clients play a full online match against a running server.",
+  "type": "module",
+  "scripts": { "smoke": "node smoke.mjs" },
+  "dependencies": { "@microsoft/signalr": "8.0.7" }
+}

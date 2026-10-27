@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <!--
+    Authoritative game server: accounts, auth, matchmaking, private rooms, live matches (SignalR),
+    and persistence. Uses only the ASP.NET Core shared framework.
+
+    PostgreSQL support lives in LudoCrown.Server.Postgres (uses the Npgsql package). It is included by
+    default. Build with -p:UsePostgres=false to compile without it (in-memory store only, for
+    environments without NuGet access).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>LudoCrown.Server</RootNamespace>
+    <UserSecretsId>ludocrown-server-dev</UserSecretsId>
+    <UsePostgres Condition="'$(UsePostgres)' == ''">true</UsePostgres>
+    <DefineConstants Condition="'$(UsePostgres)' == 'true'">$(DefineConstants);POSTGRES</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\LudoCrown.Core\LudoCrown.Core.csproj" />
+    <ProjectReference Include="..\LudoCrown.Server.Postgres\LudoCrown.Server.Postgres.csproj" Condition="'$(UsePostgres)' == 'true'" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="LudoCrown.Server.Tests" />
+    <InternalsVisibleTo Include="LudoCrown.TestShim" />
+  </ItemGroup>
+</Project>
