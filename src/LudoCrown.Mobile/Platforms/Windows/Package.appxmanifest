@@ -7,7 +7,6 @@
 
   <Identity Name="LudoCrown.Dev" Publisher="CN=LudoCrownDev" Version="0.0.0.0" />
 
-  <mp:PhoneIdentity xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest" PhoneProductId="6f1b3c86-0d2e-4b7f-9a55-6d6f0a1c2b11" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
   <Properties>
     <DisplayName>$placeholder$</DisplayName>

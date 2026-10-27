@@ -9,7 +9,7 @@
                 x:DataType="vm:FriendsViewModel">
     <Grid RowDefinitions="Auto,*">
         <views:PageHeader Title="Friends" />
-        <RefreshView Grid.Row="1" Command="{Binding RefreshCommand}" IsRefreshing="{Binding IsBusy}">
+        <RefreshView Grid.Row="1" Command="{Binding RefreshCommand}" IsRefreshing="{Binding IsBusy, Mode=OneWay}">
             <ScrollView>
                 <VerticalStackLayout Padding="20,8,20,28" Spacing="14" MaximumWidthRequest="520">
                     <Border Style="{StaticResource Card}">

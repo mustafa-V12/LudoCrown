@@ -1,0 +1,205 @@
+# Ludo Crown
+
+A polished, social Ludo game for iPhone, built with **.NET MAUI (C#)**, an **authoritative ASP.NET Core + SignalR game server**, and **PostgreSQL**.
+
+- Online matchmaking (2 or 4 players), with bots filling empty seats after a short wait
+- Private tables with a 6-character code or a `ludocrown://join/CODE` invite link, plus rematch
+- Offline play against Easy / Normal / Hard computer opponents, or pass-and-play on one phone; saved games resume automatically
+- Sign in with Apple, Google, Facebook, or passwordless email, plus a guest mode you can upgrade later
+- Profiles, avatars, levels, statistics, match history, friends (by friend code), blocking and reporting
+- Account deletion and a data download built into the app
+
+> **Status at a glance:** see [HANDOFF.md](HANDOFF.md) for exactly what is implemented, what was verified (and how), and what still needs your accounts, credentials or a Mac.
+
+![Board preview rendered from the app's drawing code](docs/board-preview.png)
+
+---
+
+## Repository layout
+
+```
+LudoCrown.sln
+src/
+  LudoCrown.Core/            Rules engine, board geometry, AI bots, dice, online protocol (no dependencies)
+  LudoCrown.App.Logic/       App view models, offline/online game sessions, auth session, API client (no MAUI)
+  LudoCrown.Mobile/          .NET MAUI app: XAML screens, board renderer, iOS/Android/Windows platform code, assets
+  LudoCrown.Server/          ASP.NET Core server: auth, REST API, SignalR hub, matches, matchmaking, private rooms
+  LudoCrown.Server.Data/     Persistence contracts + in-memory development store
+  LudoCrown.Server.Postgres/ PostgreSQL store (Npgsql), migration runner, maintenance job
+tests/
+  LudoCrown.Core.Tests/      Rules, geometry, AI, protocol, saved-game validation
+  LudoCrown.Server.Tests/    Anti-cheat, timers, reconnection, matchmaking, rooms, tokens, ID tokens, email codes
+  LudoCrown.App.Tests/       Offline/online sessions, auth session + token refresh, screen view models
+  LudoCrown.Postgres.Tests/  PostgresStore against a real database (opt-in, see below)
+db/
+  migrations/                Versioned SQL migrations (embedded into the server)
+  roles.sql                  Least-privilege database roles
+deploy/                      Dockerfile, docker-compose (server + PostgreSQL), .env.example
+docs/                        Rules, architecture, backend, database, auth setup, privacy, release checklist
+tools/                       Dev-only verification tools (see "Development tools")
+```
+
+Read more: [Architecture](docs/ARCHITECTURE.md) · [Rules](docs/RULES.md) · [Backend & deployment](docs/BACKEND.md) · [Database](docs/DATABASE.md) · [Auth setup](docs/AUTH_SETUP.md) · [Privacy](docs/PRIVACY.md) · [Release checklist](docs/RELEASE_CHECKLIST.md) · [Decisions](docs/DECISIONS.md)
+
+---
+
+## Prerequisites
+
+| For | You need |
+|---|---|
+| Server, libraries, tests | [.NET 10 SDK](https://dotnet.microsoft.com/download) |
+| The app in Visual Studio (Windows) | Visual Studio 2026 (or 2022 17.14+) with the **.NET Multi-platform App UI development** workload |
+| iOS builds and the iOS Simulator | A Mac with Xcode, paired from Visual Studio (**Tools → iOS → Pair to Mac**), or a cloud macOS build service |
+| Running on your own iPhone | Apple Developer Program membership ($99/year), Xcode signing on the paired Mac |
+| Database | PostgreSQL 15+ (local install, Docker, or a managed service) |
+
+Install the MAUI workload from a terminal if you prefer: `dotnet workload install maui`.
+
+---
+
+## Quick start (Windows + Visual Studio)
+
+### 1. Run the server
+
+You can run the server without a database. It then uses the in-memory development store, and data resets on restart.
+
+1. Open `LudoCrown.sln`.
+2. Right-click **LudoCrown.Server** → **Set as Startup Project** → press **F5**.
+3. Check that <http://localhost:5080/health> says `Healthy`.
+
+In Development the server:
+- writes email sign-in codes to the console,
+- uses a random signing key per run, so tokens stop working after a restart; sign in again,
+- fills matchmaking with bots after 10 seconds.
+
+### 2. Run the app on Windows (fastest way to try it without a Mac)
+
+1. Right-click **LudoCrown.Mobile** → **Set as Startup Project**.
+2. Pick the **Windows Machine** target and press **F5**.
+3. On the sign-in screen choose **Play as guest**, or **Play offline against the computer**.
+
+> To play online against yourself, start the app twice: one Windows instance and one Android emulator. Or run the scripted smoke-test client (see [Testing](#testing)).
+
+Debug builds connect to `http://localhost:5080` (the Android emulator uses `http://10.0.2.2:5080`). You can change the server URL in **Settings → Development** in Debug builds.
+
+### 3. Run on iOS
+
+1. Pair a Mac: **Tools → iOS → Pair to Mac**.
+2. Choose an **iOS Simulator** target and press **F5**.
+3. For a physical iPhone, the server must be reachable from the phone. Use a Visual Studio **Dev Tunnel** (HTTPS), or deploy the server, then set its URL in **Settings → Development**.
+
+Sign in with Apple only works once the capability is enabled. See [docs/AUTH_SETUP.md](docs/AUTH_SETUP.md).
+
+### Use PostgreSQL locally
+
+**With Docker:**
+
+```bash
+cp deploy/.env.example deploy/.env      # set a password and a JWT key
+docker compose -f deploy/docker-compose.yml --env-file deploy/.env up --build
+```
+
+**With your own PostgreSQL:**
+
+1. Create a database.
+2. Set the connection string with user secrets (never in `appsettings.json`):
+
+   ```bash
+   cd src/LudoCrown.Server
+   dotnet user-secrets set "ConnectionStrings:Postgres" "Host=localhost;Database=ludocrown;Username=...;Password=..."
+   dotnet user-secrets set "Jwt:SigningKey" "<base64 32 bytes>"
+   ```
+
+In Development the server applies migrations at startup. In other environments, set `Database__MigrateOnStartup=true` or apply `db/migrations/*.sql` yourself (see [docs/DATABASE.md](docs/DATABASE.md)).
+
+---
+
+## Configuration
+
+Server settings live in `src/LudoCrown.Server/appsettings.json`, which contains placeholders only. Override them with environment variables, using `__` for nesting (for example `Jwt__SigningKey`), or with user secrets in development.
+
+| Setting | Purpose |
+|---|---|
+| `ConnectionStrings:Postgres` | PostgreSQL connection. **Required outside Development**: the server refuses to start without it. |
+| `Jwt:SigningKey` | Base64 key of at least 32 bytes for access tokens. **Required outside Development.** |
+| `Auth:PublicBaseUrl` | The server's public HTTPS URL, used for Google and Facebook OAuth redirects |
+| `Auth:Apple:*`, `Auth:Google:*`, `Auth:Facebook:*`, `Auth:Email:*` | Sign-in providers. Each provider is enabled only when it is configured; the app hides buttons for disabled providers. |
+| `Match:*` | Turn timer (20 s), disconnect grace period (90 s), missed-turn limit (3), bot fill wait (30 s) |
+| `Database:MigrateOnStartup`, `Database:MatchRetentionDays` | Migration and retention behaviour |
+
+App settings that you must change before release are marked `TODO before release` in `src/LudoCrown.App.Logic/Services/PlatformServices.cs` (`AppConfig`) and in `src/LudoCrown.Mobile/LudoCrown.Mobile.csproj` (`ApplicationId`).
+
+---
+
+## Testing
+
+**In Visual Studio:** open **Test Explorer** and choose **Run All**. From a terminal:
+
+```bash
+dotnet test tests/LudoCrown.Core.Tests
+dotnet test tests/LudoCrown.Server.Tests
+dotnet test tests/LudoCrown.App.Tests
+```
+
+**PostgreSQL integration tests** need a disposable database:
+
+```bash
+# PowerShell: $env:LUDOCROWN_TEST_POSTGRES="Host=localhost;Database=ludocrown_test;Username=...;Password=..."
+export LUDOCROWN_TEST_POSTGRES="Host=localhost;Database=ludocrown_test;Username=...;Password=..."
+dotnet test tests/LudoCrown.Postgres.Tests
+```
+
+Without that variable, these tests return immediately and report as passed.
+
+**Validate all SQL against the real schema** (PostgreSQL prepares every statement):
+
+```bash
+psql "$DB_URL" -f db/migrations/0001_initial_schema.sql
+python3 tools/verify-sql.py "$DB_URL"
+```
+
+**End-to-end online smoke test:** two scripted clients sign in as guests, get matched, play a full game over SignalR, and check results, rewards and account deletion against a running server.
+
+```bash
+cd tools/smoke && npm install && node smoke.mjs http://localhost:5080
+```
+
+Dice and other randomness are injected (`IDiceRoller`, `IDelay`, `TimeProvider`), so tests are deterministic.
+
+---
+
+## Building for release
+
+- **Server:** `docker build -f deploy/Dockerfile -t ludocrown-server .` or `dotnet publish src/LudoCrown.Server -c Release`. Deployment options are in [docs/BACKEND.md](docs/BACKEND.md).
+- **iOS app:** on the paired Mac or in a macOS CI job:
+
+  ```bash
+  dotnet publish src/LudoCrown.Mobile -f net10.0-ios -c Release -p:ArchiveOnBuild=true -p:EnableAppleSignIn=true
+  ```
+
+  Then upload with Transporter or Xcode Organizer. Follow [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md).
+
+---
+
+## Development tools (`tools/`)
+
+These tools exist because the environment that generated this project could not reach nuget.org. You don't need them in Visual Studio.
+
+| Tool | What it is |
+|---|---|
+| `tools/LudoCrown.TestShim` | Runs the xUnit test sources through a tiny xUnit-compatible runner without NuGet |
+| `tools/NpgsqlPsqlStub` | Stand-in for the Npgsql API that executes queries through `psql`, used to compile and run the real `PostgresStore` without NuGet. Not for production. |
+| `tools/BoardPreview` | Renders the app's real board-drawing code to SVG, for checking visuals without a phone |
+| `tools/verify-sql.py` | Prepares every SQL statement against a migrated database |
+| `tools/smoke` | Node SignalR client for the end-to-end online test |
+
+---
+
+## Known limitations
+
+- The iOS build, signing, simulator and device runs have **not** been performed. They need a Mac, Xcode and your Apple account. The MAUI project was written for .NET 10 but has not been compiled. Expect to fix small compile issues the first time you build it in Visual Studio.
+- Sounds play on iOS only. Android and Windows builds are silent.
+- Google and Facebook sign-in use the system browser sheet, which isn't available on Windows desktop builds. Windows shows only guest, email and offline play.
+- The server holds live matches in memory on a single instance. Running several instances needs sticky routing plus a SignalR backplane (see [docs/BACKEND.md](docs/BACKEND.md)).
+- No in-app purchases, ads, tracking, voice chat or free-text chat. Coins are earned through play only and can't be spent yet.
+- Reports from players are stored in the database. There is no moderation dashboard yet; review them with SQL (see [docs/DATABASE.md](docs/DATABASE.md)).
