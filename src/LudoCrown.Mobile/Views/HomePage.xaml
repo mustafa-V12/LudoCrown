@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<views:BasePage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                xmlns:views="clr-namespace:LudoCrown.Mobile.Views"
+                xmlns:controls="clr-namespace:LudoCrown.Mobile.Controls"
+                xmlns:vm="clr-namespace:LudoCrown.App.ViewModels;assembly=LudoCrown.App.Logic"
+                x:Class="LudoCrown.Mobile.Views.HomePage"
+                x:DataType="vm:HomeViewModel">
+    <ScrollView>
+        <VerticalStackLayout Padding="20,12,20,28" Spacing="16" MaximumWidthRequest="520">
+
+            <!-- Profile bar -->
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
+                <controls:AvatarView AvatarId="{Binding AvatarId}" Size="52" VerticalOptions="Center">
+                    <controls:AvatarView.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding ProfileCommand}" />
+                    </controls:AvatarView.GestureRecognizers>
+                </controls:AvatarView>
+                <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
+                    <Label Text="{Binding DisplayName}" FontAttributes="Bold" FontSize="18" LineBreakMode="TailTruncation" />
+                    <Label Text="{Binding LevelText}" Style="{StaticResource Caption}" />
+                </VerticalStackLayout>
+                <Border Grid.Column="2" IsVisible="{Binding IsSignedIn}" Style="{StaticResource Card}" Padding="12,6" StrokeShape="RoundRectangle 16" VerticalOptions="Center">
+                    <HorizontalStackLayout Spacing="6">
+                        <Ellipse Fill="{StaticResource GoldBrush}" WidthRequest="16" HeightRequest="16" VerticalOptions="Center" />
+                        <Label Text="{Binding CoinsText}" FontAttributes="Bold" VerticalOptions="Center" SemanticProperties.Description="Coins" />
+                    </HorizontalStackLayout>
+                </Border>
+                <Button Grid.Column="3" Text="⚙" FontSize="22" Command="{Binding SettingsCommand}" Style="{StaticResource LinkButton}"
+                        WidthRequest="48" SemanticProperties.Description="Settings" />
+            </Grid>
+
+            <Border Style="{StaticResource Card}" IsVisible="{Binding IsGuest}" Padding="14,10">
+                <Grid ColumnDefinitions="*,Auto">
+                    <Label Text="You're playing as a guest. Link an account to keep your progress." Style="{StaticResource Caption}" VerticalOptions="Center" />
+                    <Button Grid.Column="1" Text="Link" Command="{Binding ProfileCommand}" Style="{StaticResource LinkButton}" />
+                </Grid>
+            </Border>
+
+            <!-- Hero -->
+            <VerticalStackLayout Spacing="4" Margin="0,8">
+                <Image Source="crown_logo.png" WidthRequest="110" HeightRequest="82" SemanticProperties.Description="Ludo Crown logo" />
+                <Label Text="Ludo Crown" Style="{StaticResource Title}" HorizontalOptions="Center" />
+            </VerticalStackLayout>
+
+            <!-- Online play -->
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="12">
+                    <Label Text="Play online" Style="{StaticResource Heading}" />
+                    <Label Text="Get matched with players around the world." Style="{StaticResource Caption}" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                        <Button Text="2 players" Command="{Binding PlayOnlineCommand}" CommandParameter="2" />
+                        <Button Grid.Column="1" Text="4 players" Command="{Binding PlayOnlineCommand}" CommandParameter="4" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Private table -->
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="12">
+                    <Label Text="Private table" Style="{StaticResource Heading}" />
+                    <Label Text="Play with friends using a table code." Style="{StaticResource Caption}" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                        <Button Text="Create table" Command="{Binding CreateTableCommand}" Style="{StaticResource SecondaryButton}" />
+                        <Button Grid.Column="1" Text="Join with code" Command="{Binding JoinTableCommand}" Style="{StaticResource SecondaryButton}" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+
+            <!-- Offline -->
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="12">
+                    <Label Text="Play offline" Style="{StaticResource Heading}" />
+                    <Label Text="Challenge the computer or pass the phone around — no internet needed." Style="{StaticResource Caption}" />
+                    <Label Text="You have an unfinished game." IsVisible="{Binding HasSavedGame}" TextColor="{StaticResource Gold}" FontSize="14" />
+                    <Button Text="Play vs computer" Command="{Binding PlayOfflineCommand}" Style="{StaticResource SecondaryButton}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                <Button Text="Profile" Command="{Binding ProfileCommand}" Style="{StaticResource LinkButton}" />
+                <Button Grid.Column="1" Text="Friends" Command="{Binding FriendsCommand}" Style="{StaticResource LinkButton}" />
+                <Button Grid.Column="2" Text="How to play" Command="{Binding RulesCommand}" Style="{StaticResource LinkButton}" />
+            </Grid>
+
+            <Button Text="Sign in to play online" IsVisible="{Binding IsSignedOut}" Command="{Binding SignInCommand}" />
+        </VerticalStackLayout>
+    </ScrollView>
+</views:BasePage>

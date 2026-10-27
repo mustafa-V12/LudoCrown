@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<views:BasePage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                xmlns:views="clr-namespace:LudoCrown.Mobile.Views"
+                xmlns:vm="clr-namespace:LudoCrown.App.ViewModels;assembly=LudoCrown.App.Logic"
+                x:Class="LudoCrown.Mobile.Views.MatchmakingPage"
+                x:DataType="vm:MatchmakingViewModel">
+    <Grid RowDefinitions="*,Auto,Auto,*" Padding="28">
+        <VerticalStackLayout Grid.Row="1" Spacing="18" HorizontalOptions="Center">
+            <Image x:Name="Crown" Source="crown_logo.png" WidthRequest="130" HeightRequest="98" SemanticProperties.Description="Searching" />
+            <Label Text="{Binding Title}" Style="{StaticResource Title}" HorizontalOptions="Center" />
+            <Label Text="{Binding Status}" Style="{StaticResource Caption}" FontSize="17" HorizontalOptions="Center" />
+            <Label Text="{Binding PlayersText}" IsVisible="{Binding Searching}" FontAttributes="Bold" TextColor="{StaticResource Gold}" HorizontalOptions="Center" />
+            <ActivityIndicator IsRunning="{Binding Searching}" IsVisible="{Binding Searching}" />
+            <Label Text="If nobody joins soon, friendly bots fill the empty seats." Style="{StaticResource Caption}" FontSize="13"
+                   HorizontalTextAlignment="Center" IsVisible="{Binding Searching}" />
+            <Label Text="{Binding Error}" IsVisible="{Binding HasError}" Style="{StaticResource ErrorText}" />
+            <Button Text="Try again" IsVisible="{Binding HasError}" Command="{Binding RetryCommand}" />
+        </VerticalStackLayout>
+        <Button Grid.Row="2" Text="Cancel" Command="{Binding CancelCommand}" Style="{StaticResource SecondaryButton}" Margin="0,24,0,0" />
+    </Grid>
+</views:BasePage>

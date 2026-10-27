@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<views:BasePage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                xmlns:views="clr-namespace:LudoCrown.Mobile.Views"
+                xmlns:controls="clr-namespace:LudoCrown.Mobile.Controls"
+                xmlns:vm="clr-namespace:LudoCrown.App.ViewModels;assembly=LudoCrown.App.Logic"
+                x:Class="LudoCrown.Mobile.Views.ProfilePage"
+                x:DataType="vm:ProfileViewModel">
+    <Grid RowDefinitions="Auto,*">
+        <views:PageHeader Title="Profile" />
+        <RefreshView Grid.Row="1" Command="{Binding RefreshCommand}" IsRefreshing="{Binding IsBusy}">
+            <ScrollView>
+                <VerticalStackLayout Padding="20,8,20,28" Spacing="16" MaximumWidthRequest="520">
+                    <VerticalStackLayout Spacing="8" HorizontalOptions="Center">
+                        <controls:AvatarView AvatarId="{Binding AvatarId}" Size="96" HorizontalOptions="Center" />
+                        <Label Text="{Binding DisplayName}" Style="{StaticResource Title}" HorizontalOptions="Center" />
+                        <Button Text="Change name" Command="{Binding RenameCommand}" Style="{StaticResource LinkButton}" />
+                    </VerticalStackLayout>
+
+                    <Border Style="{StaticResource Card}">
+                        <VerticalStackLayout Spacing="8">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <Label Text="{Binding LevelText}" Style="{StaticResource Heading}" />
+                                <Label Grid.Column="1" Text="{Binding CoinsText}" TextColor="{StaticResource Gold}" FontAttributes="Bold" VerticalOptions="Center" />
+                            </Grid>
+                            <ProgressBar Progress="{Binding LevelProgress}" ProgressColor="{StaticResource Gold}" />
+                            <Label Text="{Binding XpText}" Style="{StaticResource Caption}" />
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <Label Text="Choose an avatar" Style="{StaticResource Heading}" />
+                    <FlexLayout BindableLayout.ItemsSource="{Binding AvatarOptions}" Wrap="Wrap" JustifyContent="SpaceEvenly">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="vm:AvatarOption">
+                                <Border Margin="6" Padding="3" StrokeShape="RoundRectangle 34" StrokeThickness="3"
+                                        Stroke="{Binding IsSelected, Converter={StaticResource EqualsToColor}, ConverterParameter=True}">
+                                    <Image Source="{Binding Id, Converter={StaticResource AvatarImage}}" WidthRequest="60" HeightRequest="60" SemanticProperties.Description="{Binding Id}" />
+                                    <Border.GestureRecognizers>
+                                        <TapGestureRecognizer Command="{Binding AvatarCommand, Source={RelativeSource AncestorType={x:Type vm:ProfileViewModel}}, x:DataType=vm:ProfileViewModel}"
+                                                              CommandParameter="{Binding Id}" />
+                                    </Border.GestureRecognizers>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </FlexLayout>
+
+                    <Label Text="Statistics" Style="{StaticResource Heading}" />
+                    <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto" ColumnSpacing="10" RowSpacing="10">
+                        <Border Style="{StaticResource Card}" Padding="10"><VerticalStackLayout><Label Text="{Binding GamesText}" FontSize="22" FontAttributes="Bold" HorizontalOptions="Center" /><Label Text="Games" Style="{StaticResource Caption}" HorizontalOptions="Center" /></VerticalStackLayout></Border>
+                        <Border Grid.Column="1" Style="{StaticResource Card}" Padding="10"><VerticalStackLayout><Label Text="{Binding WinsText}" FontSize="22" FontAttributes="Bold" HorizontalOptions="Center" /><Label Text="Wins" Style="{StaticResource Caption}" HorizontalOptions="Center" /></VerticalStackLayout></Border>
+                        <Border Grid.Column="2" Style="{StaticResource Card}" Padding="10"><VerticalStackLayout><Label Text="{Binding WinRateText}" FontSize="22" FontAttributes="Bold" HorizontalOptions="Center" /><Label Text="Win rate" Style="{StaticResource Caption}" HorizontalOptions="Center" /></VerticalStackLayout></Border>
+                        <Border Grid.Row="1" Style="{StaticResource Card}" Padding="10"><VerticalStackLayout><Label Text="{Binding StreakText}" FontSize="22" FontAttributes="Bold" HorizontalOptions="Center" /><Label Text="Best streak" Style="{StaticResource Caption}" HorizontalOptions="Center" /></VerticalStackLayout></Border>
+                        <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource Card}" Padding="10"><VerticalStackLayout><Label Text="{Binding CapturesText}" FontSize="22" FontAttributes="Bold" HorizontalOptions="Center" /><Label Text="Captures" Style="{StaticResource Caption}" HorizontalOptions="Center" /></VerticalStackLayout></Border>
+                        <Border Grid.Row="1" Grid.Column="2" Style="{StaticResource Card}" Padding="10"><VerticalStackLayout><Label Text="{Binding FriendCode}" FontSize="16" FontAttributes="Bold" HorizontalOptions="Center" /><Label Text="Friend code" Style="{StaticResource Caption}" HorizontalOptions="Center" /></VerticalStackLayout></Border>
+                    </Grid>
+
+                    <Label Text="Account" Style="{StaticResource Heading}" />
+                    <Border Style="{StaticResource Card}">
+                        <VerticalStackLayout Spacing="10">
+                            <Label Text="{Binding LinkedText}" Style="{StaticResource Caption}" />
+                            <Button Text="Link an account to keep your progress" IsVisible="{Binding IsGuest}" Command="{Binding LinkCommand}" />
+                            <Button Text="Add another sign-in method" IsVisible="{Binding IsGuest, Converter={StaticResource Invert}}" Command="{Binding LinkCommand}" Style="{StaticResource SecondaryButton}" />
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <Label Text="Recent matches" Style="{StaticResource Heading}" />
+                    <Label Text="No online matches yet." Style="{StaticResource Caption}" IsVisible="{Binding HasNoHistory}" />
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding History}" Spacing="8">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="vm:HistoryRow">
+                                <Border Style="{StaticResource Card}" Padding="14,10">
+                                    <VerticalStackLayout>
+                                        <Label Text="{Binding Title}" FontAttributes="Bold" />
+                                        <Label Text="{Binding Detail}" Style="{StaticResource Caption}" FontSize="13" />
+                                    </VerticalStackLayout>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                    <Label Text="{Binding Error}" IsVisible="{Binding HasError}" Style="{StaticResource ErrorText}" />
+                </VerticalStackLayout>
+            </ScrollView>
+        </RefreshView>
+    </Grid>
+</views:BasePage>

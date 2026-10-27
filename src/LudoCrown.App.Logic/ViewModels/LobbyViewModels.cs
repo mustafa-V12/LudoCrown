@@ -252,6 +252,7 @@ public sealed class OfflineSeatOption : ObservableObject
     }
 
     public int Seat { get; }
+    public string[] Difficulties { get; } = { "Easy", "Normal", "Hard" };
     public string Name { get => _name; set => Set(ref _name, value); }
     public bool IsBot { get => _isBot; set { if (Set(ref _isBot, value)) OnPropertyChanged(nameof(IsHuman)); } }
     public bool IsHuman => !IsBot;
@@ -286,7 +287,7 @@ public sealed class OfflineSetupViewModel : ViewModelBase
     }
 
     public ObservableCollection<OfflineSeatOption> Seats { get; } = new();
-    public IReadOnlyList<string> Difficulties { get; } = new[] { "Easy", "Normal", "Hard" };
+    public string[] Difficulties { get; } = { "Easy", "Normal", "Hard" };
     public int PlayerCount { get => _playerCount; set { if (Set(ref _playerCount, value is 2 or 4 ? value : 4)) { BuildSeats(); OnPropertyChanged(nameof(IsTwo)); OnPropertyChanged(nameof(IsFour)); } } }
     public bool IsTwo => PlayerCount == 2;
     public bool IsFour => PlayerCount == 4;

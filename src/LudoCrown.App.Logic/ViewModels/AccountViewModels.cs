@@ -11,6 +11,8 @@ namespace LudoCrown.App.ViewModels;
 
 public sealed record HistoryRow(string Title, string Detail, bool Won);
 
+public sealed record AvatarOption(string Id, bool IsSelected);
+
 public sealed class ProfileViewModel : ViewModelBase
 {
     private readonly ApiClient _api;
@@ -35,7 +37,8 @@ public sealed class ProfileViewModel : ViewModelBase
 
     public MeResponse? Me { get => _me; private set { Set(ref _me, value); Refresh(); } }
     public ObservableCollection<HistoryRow> History { get; } = new();
-    public IReadOnlyList<string> AvatarIds => Avatars.All;
+    public IReadOnlyList<AvatarOption> AvatarOptions => Avatars.All.Select(a => new AvatarOption(a, a == AvatarId)).ToList();
+    public bool HasNoHistory => History.Count == 0;
     public string DisplayName => _me?.DisplayName ?? "";
     public string AvatarId => _me?.AvatarId ?? "crown";
     public string LevelText => _me is null ? "" : $"Level {_me.Level}";
@@ -61,7 +64,7 @@ public sealed class ProfileViewModel : ViewModelBase
 
     private void Refresh()
     {
-        foreach (var p in new[] { nameof(DisplayName), nameof(AvatarId), nameof(LevelText), nameof(LevelProgress), nameof(XpText), nameof(CoinsText), nameof(FriendCode),
+        foreach (var p in new[] { nameof(DisplayName), nameof(AvatarId), nameof(AvatarOptions), nameof(LevelText), nameof(LevelProgress), nameof(XpText), nameof(CoinsText), nameof(FriendCode),
                      nameof(GamesText), nameof(WinsText), nameof(WinRateText), nameof(StreakText), nameof(CapturesText), nameof(IsGuest), nameof(LinkedText) })
             OnPropertyChanged(p);
     }
@@ -80,6 +83,7 @@ public sealed class ProfileViewModel : ViewModelBase
             var when = (h.EndedAt ?? h.StartedAt).ToLocalTime().ToString("d MMM, HH:mm");
             History.Add(new HistoryRow($"{place} · {mode}", $"vs {string.Join(", ", h.Opponents)} · {when}", h.Placement == 1 && h.Result != "Abandoned"));
         }
+        OnPropertyChanged(nameof(HasNoHistory));
     });
 
     private async Task RenameAsync()
@@ -103,8 +107,8 @@ public sealed class ProfileViewModel : ViewModelBase
     {
         var options = new List<string>();
         if (_session.AppleAvailable) options.Add("Sign in with Apple");
-        if (_session.Providers?.Google ?? false) options.Add("Google");
-        if (_session.Providers?.Facebook ?? false) options.Add("Facebook");
+        if (_session.GoogleAvailable) options.Add("Google");
+        if (_session.FacebookAvailable) options.Add("Facebook");
         if (_session.Providers?.Email ?? false) options.Add("Email");
         if (options.Count == 0) { await _dialogs.AlertAsync("Not available", "No sign-in methods are configured on this server yet."); return; }
 

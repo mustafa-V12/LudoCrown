@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<views:BasePage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                xmlns:views="clr-namespace:LudoCrown.Mobile.Views"
+                xmlns:controls="clr-namespace:LudoCrown.Mobile.Controls"
+                xmlns:api="clr-namespace:LudoCrown.App.Api;assembly=LudoCrown.App.Logic"
+                xmlns:vm="clr-namespace:LudoCrown.App.ViewModels;assembly=LudoCrown.App.Logic"
+                x:Class="LudoCrown.Mobile.Views.FriendsPage"
+                x:DataType="vm:FriendsViewModel">
+    <Grid RowDefinitions="Auto,*">
+        <views:PageHeader Title="Friends" />
+        <RefreshView Grid.Row="1" Command="{Binding RefreshCommand}" IsRefreshing="{Binding IsBusy}">
+            <ScrollView>
+                <VerticalStackLayout Padding="20,8,20,28" Spacing="14" MaximumWidthRequest="520">
+                    <Border Style="{StaticResource Card}">
+                        <VerticalStackLayout Spacing="8">
+                            <Label Text="Your friend code" Style="{StaticResource Caption}" />
+                            <Label Text="{Binding MyCode}" FontSize="30" FontAttributes="Bold" CharacterSpacing="4" TextColor="{StaticResource Gold}" />
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                                <Button Text="Share code" Command="{Binding ShareCodeCommand}" Style="{StaticResource SecondaryButton}" />
+                                <Button Grid.Column="1" Text="Add friend" Command="{Binding AddCommand}" />
+                            </Grid>
+                        </VerticalStackLayout>
+                    </Border>
+
+                    <Button Text="Invite friends to a private table" Command="{Binding InviteCommand}" Style="{StaticResource SecondaryButton}" />
+
+                    <Label Text="Friend requests" Style="{StaticResource Heading}" IsVisible="{Binding HasRequests}" />
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding Requests}" Spacing="8">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="api:FriendDto">
+                                <Border Style="{StaticResource Card}" Padding="12,8">
+                                    <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="10">
+                                        <controls:AvatarView AvatarId="{Binding AvatarId}" Size="42" />
+                                        <Label Grid.Column="1" Text="{Binding DisplayName}" FontAttributes="Bold" VerticalOptions="Center" />
+                                        <Button Grid.Column="2" Text="Accept" Padding="12,6"
+                                                Command="{Binding AcceptCommand, Source={RelativeSource AncestorType={x:Type vm:FriendsViewModel}}, x:DataType=vm:FriendsViewModel}" CommandParameter="{Binding .}" />
+                                        <Button Grid.Column="3" Text="⋯" Style="{StaticResource LinkButton}" SemanticProperties.Description="More options"
+                                                Command="{Binding OptionsCommand, Source={RelativeSource AncestorType={x:Type vm:FriendsViewModel}}, x:DataType=vm:FriendsViewModel}" CommandParameter="{Binding .}" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+
+                    <Label Text="Friends" Style="{StaticResource Heading}" />
+                    <Label Text="No friends yet. Share your code or add someone by theirs." Style="{StaticResource Caption}" IsVisible="{Binding HasNoFriends}" />
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding Friends}" Spacing="8">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="api:FriendDto">
+                                <Border Style="{StaticResource Card}" Padding="12,8">
+                                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                                        <controls:AvatarView AvatarId="{Binding AvatarId}" Size="42" />
+                                        <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
+                                            <Label Text="{Binding DisplayName}" FontAttributes="Bold" />
+                                            <Label Text="{Binding Level, StringFormat='Level {0}'}" Style="{StaticResource Caption}" FontSize="13" />
+                                        </VerticalStackLayout>
+                                        <Button Grid.Column="2" Text="⋯" Style="{StaticResource LinkButton}" SemanticProperties.Description="Friend options"
+                                                Command="{Binding OptionsCommand, Source={RelativeSource AncestorType={x:Type vm:FriendsViewModel}}, x:DataType=vm:FriendsViewModel}" CommandParameter="{Binding .}" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                    <Label Text="{Binding Error}" IsVisible="{Binding HasError}" Style="{StaticResource ErrorText}" />
+                </VerticalStackLayout>
+            </ScrollView>
+        </RefreshView>
+    </Grid>
+</views:BasePage>

@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    DEVELOPMENT TOOL ONLY. Renders the real BoardDrawable/Palette code from the MAUI app to SVG by compiling it
+    against a tiny stand-in for the Microsoft.Maui.Graphics API (GraphicsShim.cs). Used to visually check the
+    board without an iPhone/simulator. Usage: dotnet run (writes board.svg; pass a path to change it)
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <NoWarn>$(NoWarn);CS8618</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\..\src\LudoCrown.Mobile\Controls\Palette.cs" Link="App\Palette.cs" />
+    <Compile Include="..\..\src\LudoCrown.Mobile\Controls\BoardDrawable.cs" Link="App\BoardDrawable.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Microsoft.Maui.Graphics" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\LudoCrown.App.Logic\LudoCrown.App.Logic.csproj" />
+  </ItemGroup>
+</Project>

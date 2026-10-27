@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<views:BasePage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                xmlns:views="clr-namespace:LudoCrown.Mobile.Views"
+                xmlns:vm="clr-namespace:LudoCrown.App.ViewModels;assembly=LudoCrown.App.Logic"
+                x:Class="LudoCrown.Mobile.Views.EmailSignInPage"
+                x:DataType="vm:EmailSignInViewModel">
+    <Grid RowDefinitions="Auto,*">
+        <views:PageHeader Title="{Binding Title}" />
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Padding="28,20" Spacing="14" MaximumWidthRequest="480">
+                <Label Text="We'll email you a 6-digit code. No password needed." Style="{StaticResource Caption}" />
+                <Entry Placeholder="you@example.com" Text="{Binding Email}" Keyboard="Email" IsSpellCheckEnabled="False" IsTextPredictionEnabled="False"
+                       IsEnabled="{Binding CodeNotSent}" SemanticProperties.Description="Email address" ReturnCommand="{Binding SendCodeCommand}" />
+                <Button Text="Send code" Command="{Binding SendCodeCommand}" IsVisible="{Binding CodeNotSent}" />
+
+                <VerticalStackLayout Spacing="14" IsVisible="{Binding CodeSent}">
+                    <Label Text="Check your inbox and enter the code." Style="{StaticResource Caption}" />
+                    <Entry Placeholder="123456" Text="{Binding Code}" Keyboard="Numeric" MaxLength="6" HorizontalTextAlignment="Center" FontSize="26"
+                           SemanticProperties.Description="Six digit code" ReturnCommand="{Binding VerifyCommand}" />
+                    <Button Text="Sign in" Command="{Binding VerifyCommand}" />
+                    <Button Text="Use a different email" Command="{Binding ChangeEmailCommand}" Style="{StaticResource LinkButton}" />
+                </VerticalStackLayout>
+
+                <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
+                <Label Text="{Binding Error}" IsVisible="{Binding HasError}" Style="{StaticResource ErrorText}" />
+            </VerticalStackLayout>
+        </ScrollView>
+    </Grid>
+</views:BasePage>

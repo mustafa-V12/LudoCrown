@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<views:BasePage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                xmlns:views="clr-namespace:LudoCrown.Mobile.Views"
+                xmlns:controls="clr-namespace:LudoCrown.Mobile.Controls"
+                xmlns:vm="clr-namespace:LudoCrown.App.ViewModels;assembly=LudoCrown.App.Logic"
+                x:Class="LudoCrown.Mobile.Views.GamePage"
+                x:DataType="vm:GameViewModel">
+    <Grid RowDefinitions="Auto,Auto,*,Auto,Auto" Padding="10,4,10,10" RowSpacing="8">
+
+        <!-- Top bar -->
+        <Grid ColumnDefinitions="Auto,*,Auto">
+            <Button Text="✕" Command="{Binding LeaveCommand}" Style="{StaticResource LinkButton}" FontSize="22" WidthRequest="48"
+                    SemanticProperties.Description="Leave game" />
+            <Label Grid.Column="1" x:Name="StatusLabel" Text="{Binding Status}" FontAttributes="Bold" FontSize="16"
+                   HorizontalTextAlignment="Center" VerticalOptions="Center" LineBreakMode="TailTruncation" MaxLines="2" />
+        </Grid>
+
+        <!-- Top seats: Emerald (top-left) and Topaz (top-right), matching their board corners -->
+        <Grid Grid.Row="1" ColumnDefinitions="*,*" ColumnSpacing="8">
+            <ContentView x:Name="SeatTopLeft" />
+            <ContentView Grid.Column="1" x:Name="SeatTopRight" />
+        </Grid>
+
+        <controls:BoardView Grid.Row="2" x:Name="Board" HorizontalOptions="Fill" VerticalOptions="Fill" />
+
+        <!-- Bottom seats: Ruby (bottom-left) and Sapphire (bottom-right), with the die between them -->
+        <Grid Grid.Row="3" ColumnDefinitions="*,Auto,*" ColumnSpacing="8">
+            <ContentView x:Name="SeatBottomLeft" VerticalOptions="Center" />
+            <controls:DiceView Grid.Column="1" x:Name="Dice" />
+            <ContentView Grid.Column="2" x:Name="SeatBottomRight" VerticalOptions="Center" />
+        </Grid>
+
+        <!-- Quick reactions (online only; preset, no free text) -->
+        <ScrollView Grid.Row="4" Orientation="Horizontal" IsVisible="{Binding ShowReactions}" HorizontalScrollBarVisibility="Never">
+            <HorizontalStackLayout x:Name="ReactionBar" Spacing="8" HorizontalOptions="Center" />
+        </ScrollView>
+
+        <!-- Notice toast -->
+        <Border Grid.Row="2" IsVisible="{Binding HasNotice}" Style="{StaticResource Card}" Padding="16,10" Margin="24,0"
+                VerticalOptions="End" HorizontalOptions="Center" Background="#E6140C2E" InputTransparent="True">
+            <Label Text="{Binding Notice}" HorizontalTextAlignment="Center" FontSize="15" />
+        </Border>
+    </Grid>
+</views:BasePage>

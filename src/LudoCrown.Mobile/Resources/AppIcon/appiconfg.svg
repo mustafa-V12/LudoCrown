@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="456" height="456" viewBox="0 0 456 456">
+  <!-- Ludo Crown mark: a gold crown resting on an ivory die with four jewel pips. Original artwork. -->
+  <rect x="128" y="196" width="200" height="176" rx="34" fill="#FBF3E4"/>
+  <rect x="128" y="340" width="200" height="32" rx="16" fill="#D9C9A8"/>
+  <circle cx="178" cy="246" r="18" fill="#D7263D"/>
+  <circle cx="278" cy="246" r="18" fill="#17A673"/>
+  <circle cx="178" cy="316" r="18" fill="#2F6FE0"/>
+  <circle cx="278" cy="316" r="18" fill="#F2A71B"/>
+  <path d="M120 186 L104 92 L164 136 L228 72 L292 136 L352 92 L336 186 Z" fill="#E9B949" stroke="#B8862B" stroke-width="8" stroke-linejoin="round"/>
+  <circle cx="104" cy="88" r="14" fill="#E9B949" stroke="#B8862B" stroke-width="6"/>
+  <circle cx="228" cy="66" r="15" fill="#E9B949" stroke="#B8862B" stroke-width="6"/>
+  <circle cx="352" cy="88" r="14" fill="#E9B949" stroke="#B8862B" stroke-width="6"/>
+  <rect x="122" y="168" width="212" height="22" rx="8" fill="#B8862B"/>
+  <circle cx="228" cy="148" r="11" fill="#D7263D"/>
+</svg>

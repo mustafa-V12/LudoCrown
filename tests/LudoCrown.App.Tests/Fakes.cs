@@ -64,6 +64,7 @@ public sealed class NullFeedback : IFeedbackService
 
 public sealed class FakeBrowser : IAuthBrowser
 {
+    public bool IsSupported { get; set; } = true;
     public Uri? LastStart;
     public IReadOnlyDictionary<string, string>? Result;
     public Task<IReadOnlyDictionary<string, string>?> AuthenticateAsync(Uri startUrl, Uri callbackUrl) { LastStart = startUrl; return Task.FromResult(Result); }

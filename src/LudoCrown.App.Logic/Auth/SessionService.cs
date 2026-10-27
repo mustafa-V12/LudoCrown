@@ -85,6 +85,8 @@ public sealed class SessionService : ITokenProvider
     }
 
     public bool AppleAvailable => _apple.IsSupported && (Providers?.Apple ?? false);
+    public bool GoogleAvailable => _browser.IsSupported && (Providers?.Google ?? false);
+    public bool FacebookAvailable => _browser.IsSupported && (Providers?.Facebook ?? false);
 
     /// <summary>Native Sign in with Apple. With <paramref name="link"/> the identity is added to the current (guest) account.</summary>
     public async Task<AuthResult> SignInWithAppleAsync(bool link = false)

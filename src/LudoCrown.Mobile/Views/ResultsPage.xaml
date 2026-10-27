@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<views:BasePage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                xmlns:views="clr-namespace:LudoCrown.Mobile.Views"
+                xmlns:vm="clr-namespace:LudoCrown.App.ViewModels;assembly=LudoCrown.App.Logic"
+                x:Class="LudoCrown.Mobile.Views.ResultsPage"
+                x:DataType="vm:ResultsViewModel">
+    <Grid RowDefinitions="*,Auto">
+        <ScrollView>
+            <VerticalStackLayout Padding="24,40,24,12" Spacing="16" MaximumWidthRequest="480">
+                <Image x:Name="Crown" Source="crown_logo.png" WidthRequest="140" HeightRequest="105" SemanticProperties.Description="Crown" />
+                <Label Text="{Binding Title}" Style="{StaticResource Title}" HorizontalTextAlignment="Center" />
+                <Label Text="{Binding Subtitle}" Style="{StaticResource Caption}" HorizontalOptions="Center" />
+                <Border Style="{StaticResource Card}" IsVisible="{Binding HasRewards}" HorizontalOptions="Center" Padding="20,10">
+                    <Label Text="{Binding RewardsText}" FontAttributes="Bold" TextColor="{StaticResource Gold}" FontSize="18" />
+                </Border>
+                <VerticalStackLayout BindableLayout.ItemsSource="{Binding Rows}" Spacing="10" Margin="0,8">
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ResultRow">
+                            <Border Style="{StaticResource Card}" Padding="14,10">
+                                <Grid ColumnDefinitions="56,Auto,*" ColumnSpacing="12">
+                                    <Label Text="{Binding PlacementText}" FontSize="20" FontAttributes="Bold" TextColor="{StaticResource Gold}" VerticalOptions="Center" />
+                                    <BoxView Grid.Column="1" Color="{Binding Color, Converter={StaticResource PlayerColor}}" WidthRequest="18" HeightRequest="18" CornerRadius="9" VerticalOptions="Center" />
+                                    <Label Grid.Column="2" Text="{Binding Name}" FontSize="18" VerticalOptions="Center" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
+                <Label Text="{Binding Error}" IsVisible="{Binding HasError}" Style="{StaticResource ErrorText}" />
+            </VerticalStackLayout>
+        </ScrollView>
+        <VerticalStackLayout Grid.Row="1" Padding="24,8,24,24" Spacing="10">
+            <Button Text="{Binding PlayAgainText}" Command="{Binding PlayAgainCommand}" />
+            <Button Text="Home" Command="{Binding HomeCommand}" Style="{StaticResource SecondaryButton}" />
+        </VerticalStackLayout>
+    </Grid>
+</views:BasePage>

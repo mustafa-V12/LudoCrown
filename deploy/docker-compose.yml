@@ -1,0 +1,40 @@
+# Local development stack: PostgreSQL + the game server.
+#   cp deploy/.env.example deploy/.env   (then edit values)
+#   docker compose -f deploy/docker-compose.yml --env-file deploy/.env up --build
+# Server: http://localhost:5080   Health: http://localhost:5080/health
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ludocrown
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ludocrown"]
+      interval: 5s
+      retries: 10
+
+  server:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Postgres: "Host=db;Database=ludocrown;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
+      Database__MigrateOnStartup: "true"
+      Jwt__SigningKey: ${JWT_SIGNING_KEY}
+      Auth__PublicBaseUrl: "http://localhost:5080"
+      Auth__Email__Enabled: "true"
+      Auth__Email__Sender: "Log"
+    ports:
+      - "5080:8080"
+
+volumes:
+  pgdata:

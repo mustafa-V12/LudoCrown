@@ -56,8 +56,8 @@ public sealed class SignInViewModel : ViewModelBase
     public ICommand RetryCommand { get; }
 
     public bool ShowApple => _session.AppleAvailable;
-    public bool ShowGoogle => _providers?.Google ?? false;
-    public bool ShowFacebook => _providers?.Facebook ?? false;
+    public bool ShowGoogle => _providers is not null && _session.GoogleAvailable;
+    public bool ShowFacebook => _providers is not null && _session.FacebookAvailable;
     public bool ShowEmail => _providers?.Email ?? false;
     public bool ShowGuest => _providers?.Guest ?? false;
     public bool ServerReachable => _providers is not null;

@@ -1,0 +1,55 @@
+# Builds and tests the shared core, server and app logic, and validates the database schema and SQL.
+# (The MAUI iOS app needs a macOS runner with Xcode; see the commented job at the bottom.)
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ludocrown_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ci" --health-interval 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - name: Build server and libraries
+        run: |
+          dotnet build src/LudoCrown.Server/LudoCrown.Server.csproj -c Release
+          dotnet build src/LudoCrown.App.Logic/LudoCrown.App.Logic.csproj -c Release
+      - name: Unit tests
+        run: |
+          dotnet test tests/LudoCrown.Core.Tests -c Release
+          dotnet test tests/LudoCrown.Server.Tests -c Release
+          dotnet test tests/LudoCrown.App.Tests -c Release
+      - name: PostgreSQL integration tests
+        env:
+          LUDOCROWN_TEST_POSTGRES: "Host=localhost;Database=ludocrown_test;Username=ci;Password=ci"
+        run: dotnet test tests/LudoCrown.Postgres.Tests -c Release
+      - name: Validate SQL statements against the schema
+        env:
+          PGPASSWORD: ci
+        run: |
+          createdb -h localhost -U ci ludocrown_verify
+          psql -h localhost -U ci -d ludocrown_verify -v ON_ERROR_STOP=1 -f db/migrations/0001_initial_schema.sql
+          python3 tools/verify-sql.py "postgresql://ci:ci@localhost/ludocrown_verify"
+
+  # ios:
+  #   runs-on: macos-15
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-dotnet@v4
+  #       with: { dotnet-version: "10.0.x" }
+  #     - run: dotnet workload install maui-ios
+  #     - run: dotnet build src/LudoCrown.Mobile -f net10.0-ios -c Debug

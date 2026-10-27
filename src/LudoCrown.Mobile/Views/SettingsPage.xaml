@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<views:BasePage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                xmlns:views="clr-namespace:LudoCrown.Mobile.Views"
+                xmlns:vm="clr-namespace:LudoCrown.App.ViewModels;assembly=LudoCrown.App.Logic"
+                x:Class="LudoCrown.Mobile.Views.SettingsPage"
+                x:DataType="vm:SettingsViewModel">
+    <Grid RowDefinitions="Auto,*">
+        <views:PageHeader Title="Settings" />
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Padding="20,8,20,28" Spacing="14" MaximumWidthRequest="520">
+                <Label Text="Game" Style="{StaticResource Heading}" />
+                <Border Style="{StaticResource Card}">
+                    <VerticalStackLayout Spacing="6">
+                        <Grid ColumnDefinitions="*,Auto"><Label Text="Sound effects" VerticalOptions="Center" /><Switch Grid.Column="1" IsToggled="{Binding Sound}" SemanticProperties.Description="Sound effects" /></Grid>
+                        <Grid ColumnDefinitions="*,Auto"><Label Text="Haptics" VerticalOptions="Center" /><Switch Grid.Column="1" IsToggled="{Binding Haptics}" SemanticProperties.Description="Haptics" /></Grid>
+                        <Grid ColumnDefinitions="*,Auto"><Label Text="Reduce motion" VerticalOptions="Center" /><Switch Grid.Column="1" IsToggled="{Binding ReduceMotion}" SemanticProperties.Description="Reduce motion" /></Grid>
+                        <Grid ColumnDefinitions="*,Auto"><Label Text="Auto-move when only one move" VerticalOptions="Center" /><Switch Grid.Column="1" IsToggled="{Binding AutoMoveSingle}" SemanticProperties.Description="Auto move single option" /></Grid>
+                        <Grid ColumnDefinitions="*,Auto"><Label Text="Show quick reactions" VerticalOptions="Center" /><Switch Grid.Column="1" IsToggled="{Binding ShowReactions}" SemanticProperties.Description="Show reactions" /></Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <Label Text="Help &amp; privacy" Style="{StaticResource Heading}" />
+                <Border Style="{StaticResource Card}">
+                    <VerticalStackLayout Spacing="4">
+                        <Button Text="How to play" Command="{Binding RulesCommand}" Style="{StaticResource LinkButton}" HorizontalOptions="Start" />
+                        <Button Text="Privacy policy" Command="{Binding PrivacyCommand}" Style="{StaticResource LinkButton}" HorizontalOptions="Start" />
+                        <Button Text="Support &amp; contact" Command="{Binding SupportCommand}" Style="{StaticResource LinkButton}" HorizontalOptions="Start" />
+                        <Button Text="Blocked players" Command="{Binding BlockedCommand}" IsVisible="{Binding IsSignedIn}" Style="{StaticResource LinkButton}" HorizontalOptions="Start" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <Label Text="Account" Style="{StaticResource Heading}" IsVisible="{Binding IsSignedIn}" />
+                <Border Style="{StaticResource Card}" IsVisible="{Binding IsSignedIn}">
+                    <VerticalStackLayout Spacing="10">
+                        <Button Text="Download my data" Command="{Binding ExportCommand}" Style="{StaticResource SecondaryButton}" />
+                        <Button Text="Sign out" Command="{Binding SignOutCommand}" Style="{StaticResource SecondaryButton}" />
+                        <Button Text="Delete account" Command="{Binding DeleteAccountCommand}" Style="{StaticResource DangerButton}" />
+                        <Label Text="Deleting your account removes your profile, stats, friends and sign-in methods from our servers." Style="{StaticResource Caption}" FontSize="12" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <Border Style="{StaticResource Card}" IsVisible="{Binding IsDevelopment}">
+                    <VerticalStackLayout Spacing="6">
+                        <Label Text="Development" Style="{StaticResource Heading}" />
+                        <Label Text="{Binding ServerUrl, StringFormat='Server: {0}'}" Style="{StaticResource Caption}" />
+                        <Button Text="Change server URL" Command="{Binding SetServerCommand}" Style="{StaticResource LinkButton}" HorizontalOptions="Start" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
+                <Label Text="{Binding Error}" IsVisible="{Binding HasError}" Style="{StaticResource ErrorText}" />
+                <Label Text="{Binding VersionText}" Style="{StaticResource Caption}" HorizontalOptions="Center" FontSize="12" />
+            </VerticalStackLayout>
+        </ScrollView>
+    </Grid>
+</views:BasePage>

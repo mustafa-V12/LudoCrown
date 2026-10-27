@@ -75,6 +75,8 @@ public interface IConnectivityService
 /// <summary>Opens the system browser sheet for OAuth (MAUI WebAuthenticator / ASWebAuthenticationSession).</summary>
 public interface IAuthBrowser
 {
+    /// <summary>False where MAUI WebAuthenticator is unavailable (e.g. Windows desktop builds).</summary>
+    bool IsSupported { get; }
     /// <summary>Returns the callback query parameters, or null if the user cancelled.</summary>
     Task<IReadOnlyDictionary<string, string>?> AuthenticateAsync(Uri startUrl, Uri callbackUrl);
 }

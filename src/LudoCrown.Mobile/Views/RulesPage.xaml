@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<views:BasePage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                xmlns:views="clr-namespace:LudoCrown.Mobile.Views"
+                x:Class="LudoCrown.Mobile.Views.RulesPage">
+    <Grid RowDefinitions="Auto,*">
+        <views:PageHeader Title="How to play" />
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Padding="22,8,22,32" Spacing="12" MaximumWidthRequest="560">
+                <Label Text="Goal" Style="{StaticResource Heading}" />
+                <Label Text="Be the first to bring all four of your pieces around the board and up your home column to the crown in the centre." />
+                <Label Text="Your turn" Style="{StaticResource Heading}" />
+                <Label Text="• Tap the die to roll, then tap a glowing piece to move it that many squares.&#10;• A piece leaves your yard only with a 6, landing on your coloured start square.&#10;• Rolling a 6 gives you another roll — but three 6s in a row ends your turn.&#10;• If no piece can move, your turn passes." />
+                <Label Text="Capturing" Style="{StaticResource Heading}" />
+                <Label Text="Land exactly on an opponent's piece to send it back to their yard — and roll again. Your own pieces can share a square." />
+                <Label Text="Safe squares" Style="{StaticResource Heading}" />
+                <Label Text="Pieces on a star or on any coloured start square can't be captured. Pieces in a home column are always safe." />
+                <Label Text="Reaching the crown" Style="{StaticResource Heading}" />
+                <Label Text="After almost a full lap, pieces turn into your home column. You need the exact number to reach the crown. Crowning a piece earns another roll." />
+                <Label Text="Online play" Style="{StaticResource Heading}" />
+                <Label Text="The server rolls every die and checks every move, so online games are fair. You have 20 seconds per turn; if you run out of time or disconnect, your turn is played automatically. Players who leave or stay away too long are replaced by a bot and don't receive rewards." />
+                <Label Text="Offline play" Style="{StaticResource Heading}" />
+                <Label Text="Play against Easy, Normal or Hard computer opponents, or pass the phone between friends. Offline games are saved automatically — you can close the app and resume later." />
+            </VerticalStackLayout>
+        </ScrollView>
+    </Grid>
+</views:BasePage>

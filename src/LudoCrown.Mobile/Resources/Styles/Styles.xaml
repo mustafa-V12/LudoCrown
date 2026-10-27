@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+
+    <Style TargetType="Page" ApplyToDerivedTypes="True">
+        <Setter Property="Background" Value="{StaticResource BackgroundBrush}" />
+        <Setter Property="Padding" Value="0" />
+    </Style>
+
+    <Style TargetType="Shell" ApplyToDerivedTypes="True">
+        <Setter Property="Shell.BackgroundColor" Value="{StaticResource Night}" />
+        <Setter Property="Shell.ForegroundColor" Value="{StaticResource Gold}" />
+        <Setter Property="Shell.TitleColor" Value="{StaticResource Ivory}" />
+        <Setter Property="Shell.NavBarHasShadow" Value="False" />
+    </Style>
+
+    <Style TargetType="Label">
+        <Setter Property="TextColor" Value="{StaticResource Ivory}" />
+        <Setter Property="FontSize" Value="16" />
+    </Style>
+
+    <Style x:Key="Title" TargetType="Label">
+        <Setter Property="FontSize" Value="28" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="TextColor" Value="{StaticResource Ivory}" />
+        <Setter Property="SemanticProperties.HeadingLevel" Value="Level1" />
+    </Style>
+
+    <Style x:Key="Heading" TargetType="Label">
+        <Setter Property="FontSize" Value="19" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="TextColor" Value="{StaticResource Gold}" />
+        <Setter Property="SemanticProperties.HeadingLevel" Value="Level2" />
+    </Style>
+
+    <Style x:Key="Caption" TargetType="Label">
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="TextColor" Value="{StaticResource Muted}" />
+    </Style>
+
+    <Style x:Key="ErrorText" TargetType="Label">
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="TextColor" Value="{StaticResource Danger}" />
+        <Setter Property="HorizontalTextAlignment" Value="Center" />
+    </Style>
+
+    <!-- Buttons: minimum 50pt tall for comfortable touch targets. -->
+    <Style TargetType="Button">
+        <Setter Property="Background" Value="{StaticResource GoldBrush}" />
+        <Setter Property="TextColor" Value="{StaticResource Ink}" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="FontSize" Value="17" />
+        <Setter Property="CornerRadius" Value="16" />
+        <Setter Property="MinimumHeightRequest" Value="50" />
+        <Setter Property="Padding" Value="18,12" />
+        <Setter Property="VisualStateManager.VisualStateGroups">
+            <VisualStateGroupList>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal" />
+                    <VisualState x:Name="Disabled">
+                        <VisualState.Setters>
+                            <Setter Property="Opacity" Value="0.45" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="Pressed">
+                        <VisualState.Setters>
+                            <Setter Property="Scale" Value="0.97" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateGroupList>
+        </Setter>
+    </Style>
+
+    <Style x:Key="SecondaryButton" TargetType="Button">
+        <Setter Property="Background" Value="{StaticResource Plum}" />
+        <Setter Property="TextColor" Value="{StaticResource Ivory}" />
+        <Setter Property="BorderColor" Value="{StaticResource PlumLight}" />
+        <Setter Property="BorderWidth" Value="1.5" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="FontSize" Value="16" />
+        <Setter Property="CornerRadius" Value="16" />
+        <Setter Property="MinimumHeightRequest" Value="50" />
+        <Setter Property="Padding" Value="16,12" />
+    </Style>
+
+    <Style x:Key="LinkButton" TargetType="Button">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="TextColor" Value="{StaticResource Gold}" />
+        <Setter Property="FontSize" Value="16" />
+        <Setter Property="MinimumHeightRequest" Value="44" />
+        <Setter Property="Padding" Value="8" />
+    </Style>
+
+    <Style x:Key="DangerButton" TargetType="Button">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="TextColor" Value="{StaticResource Danger}" />
+        <Setter Property="BorderColor" Value="{StaticResource Danger}" />
+        <Setter Property="BorderWidth" Value="1.5" />
+        <Setter Property="CornerRadius" Value="16" />
+        <Setter Property="MinimumHeightRequest" Value="50" />
+    </Style>
+
+    <Style x:Key="Card" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource Velvet}" />
+        <Setter Property="Stroke" Value="{StaticResource PlumLight}" />
+        <Setter Property="StrokeThickness" Value="1" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 20" />
+        <Setter Property="Padding" Value="16" />
+    </Style>
+
+    <Style TargetType="Entry">
+        <Setter Property="TextColor" Value="{StaticResource Ink}" />
+        <Setter Property="PlaceholderColor" Value="#8A7FA8" />
+        <Setter Property="BackgroundColor" Value="{StaticResource Ivory}" />
+        <Setter Property="FontSize" Value="18" />
+        <Setter Property="MinimumHeightRequest" Value="50" />
+    </Style>
+
+    <Style TargetType="Switch">
+        <Setter Property="OnColor" Value="{StaticResource GoldDeep}" />
+        <Setter Property="ThumbColor" Value="{StaticResource Ivory}" />
+    </Style>
+
+    <Style TargetType="ActivityIndicator">
+        <Setter Property="Color" Value="{StaticResource Gold}" />
+    </Style>
+
+    <Style TargetType="Picker">
+        <Setter Property="TextColor" Value="{StaticResource Ivory}" />
+        <Setter Property="TitleColor" Value="{StaticResource Muted}" />
+        <Setter Property="MinimumHeightRequest" Value="44" />
+    </Style>
+</ResourceDictionary>

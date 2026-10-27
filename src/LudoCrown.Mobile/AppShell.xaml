@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Shell xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+       xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+       xmlns:views="clr-namespace:LudoCrown.Mobile.Views"
+       x:Class="LudoCrown.Mobile.AppShell"
+       Shell.FlyoutBehavior="Disabled"
+       Shell.NavBarIsVisible="False">
+    <!-- Top-level routes: //splash, //signin, //home. Other screens are pushed (see AppShell.xaml.cs). -->
+    <ShellContent Route="splash" ContentTemplate="{DataTemplate views:SplashPage}" />
+    <ShellContent Route="signin" ContentTemplate="{DataTemplate views:SignInPage}" />
+    <ShellContent Route="home" ContentTemplate="{DataTemplate views:HomePage}" />
+</Shell>
