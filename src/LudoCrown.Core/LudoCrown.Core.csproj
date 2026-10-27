@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Pure C# domain layer: board geometry, Ludo rules, game state, AI and the online protocol.
+    No external packages and no UI/network code, so it is shared by the iOS app (offline play),
+    the authoritative server, and the tests.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>LudoCrown.Core</RootNamespace>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+</Project>

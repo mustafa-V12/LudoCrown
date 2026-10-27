@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    DEVELOPMENT TOOL ONLY. Runs the xUnit test sources without NuGet access by compiling them against a
+    tiny xUnit-compatible shim (Fact/Theory/InlineData/MemberData/Assert) and a reflection runner.
+    It exists because the build environment used to create this project could not reach nuget.org.
+    In Visual Studio, use the real test projects in /tests (Test Explorer) instead.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <NoWarn>$(NoWarn);CS8618;xUnit1026</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\..\tests\LudoCrown.Core.Tests\**\*.cs" Exclude="..\..\tests\LudoCrown.Core.Tests\obj\**;..\..\tests\LudoCrown.Core.Tests\bin\**" LinkBase="Core.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\LudoCrown.Core\LudoCrown.Core.csproj" />
+  </ItemGroup>
+</Project>

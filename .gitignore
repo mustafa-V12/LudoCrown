@@ -1,0 +1,14 @@
+bin/
+obj/
+.vs/
+*.user
+*.suo
+.idea/
+TestResults/
+appsettings.*.local.json
+*.p8
+*.pfx
+*.p12
+*.mobileprovision
+.env
+secrets/
