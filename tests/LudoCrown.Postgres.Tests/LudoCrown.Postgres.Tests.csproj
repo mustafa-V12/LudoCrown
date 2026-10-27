@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Integration tests for the PostgreSQL store. They need a disposable database:
+      set LUDOCROWN_TEST_POSTGRES=Host=localhost;Database=ludocrown_test;Username=...;Password=...
+    Without that variable every test returns immediately (reported as passed, with a console note).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\LudoCrown.Server.Postgres\LudoCrown.Server.Postgres.csproj" />
+  </ItemGroup>
+</Project>

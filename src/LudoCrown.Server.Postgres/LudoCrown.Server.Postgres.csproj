@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    PostgreSQL implementation of the server's store interfaces, plus the migration runner.
+    SQL lives in Sql.cs and is validated against the real schema by tools/verify-sql.py.
+    Migrations are the .sql files in /db/migrations, embedded into this assembly.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>LudoCrown.Server.Postgres</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Npgsql" Version="9.0.3" Condition="'$(NpgsqlStub)' != 'true'" />
+    <!-- DEV VERIFICATION ONLY: compile/run against a psql-backed stand-in when NuGet is unavailable. -->
+    <ProjectReference Include="..\..\tools\NpgsqlPsqlStub\NpgsqlPsqlStub.csproj" Condition="'$(NpgsqlStub)' == 'true'" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\db\migrations\*.sql" LogicalName="migrations.%(Filename)%(Extension)" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\LudoCrown.Server.Data\LudoCrown.Server.Data.csproj" />
+  </ItemGroup>
+</Project>

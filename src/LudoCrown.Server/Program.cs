@@ -40,7 +40,11 @@ var connectionString = config.GetConnectionString("Postgres");
 if (!string.IsNullOrWhiteSpace(connectionString))
 {
 #if POSTGRES
-    LudoCrown.Server.Postgres.PostgresServiceCollectionExtensions.AddLudoPostgres(builder.Services, connectionString);
+    LudoCrown.Server.Postgres.PostgresServiceCollectionExtensions.AddLudoPostgres(builder.Services, connectionString, new LudoCrown.Server.Postgres.PostgresOptions
+    {
+        MigrateOnStartup = config.GetValue("Database:MigrateOnStartup", builder.Environment.IsDevelopment()),
+        MatchRetentionDays = config.GetValue("Database:MatchRetentionDays", 730),
+    });
 #else
     throw new InvalidOperationException("This build was compiled without PostgreSQL support (UsePostgres=false).");
 #endif

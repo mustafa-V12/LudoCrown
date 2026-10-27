@@ -14,6 +14,11 @@
     <Compile Include="..\..\tests\LudoCrown.Core.Tests\**\*.cs" Exclude="..\..\tests\LudoCrown.Core.Tests\obj\**;..\..\tests\LudoCrown.Core.Tests\bin\**" LinkBase="Core.Tests" />
     <Compile Include="..\..\tests\LudoCrown.Server.Tests\**\*.cs" Exclude="..\..\tests\LudoCrown.Server.Tests\obj\**;..\..\tests\LudoCrown.Server.Tests\bin\**" LinkBase="Server.Tests" />
   </ItemGroup>
+  <!-- With -p:NpgsqlStub=true also compile the PostgreSQL integration tests (against the psql-backed stub). -->
+  <ItemGroup Condition="'$(NpgsqlStub)' == 'true'">
+    <Compile Include="..\..\tests\LudoCrown.Postgres.Tests\**\*.cs" Exclude="..\..\tests\LudoCrown.Postgres.Tests\obj\**;..\..\tests\LudoCrown.Postgres.Tests\bin\**" LinkBase="Postgres.Tests" />
+    <ProjectReference Include="..\..\src\LudoCrown.Server.Postgres\LudoCrown.Server.Postgres.csproj" />
+  </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>

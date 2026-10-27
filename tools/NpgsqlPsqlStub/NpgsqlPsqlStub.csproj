@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    DEVELOPMENT VERIFICATION TOOL ONLY — never used in the app or in production.
+    A tiny stand-in for the Npgsql API surface used by LudoCrown.Server.Postgres. Each command is executed by
+    the `psql` command-line client against a real PostgreSQL database, so the real PostgresStore code and SQL can
+    be compiled and exercised in an environment without NuGet access. Transactions are NOT honoured (each command
+    runs in its own psql session). Build with -p:NpgsqlStub=true to use it.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>Npgsql</AssemblyName>
+    <RootNamespace>Npgsql</RootNamespace>
+  </PropertyGroup>
+</Project>

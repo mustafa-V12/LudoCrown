@@ -16,6 +16,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\LudoCrown.Core\LudoCrown.Core.csproj" />
+    <ProjectReference Include="..\LudoCrown.Server.Data\LudoCrown.Server.Data.csproj" />
     <ProjectReference Include="..\LudoCrown.Server.Postgres\LudoCrown.Server.Postgres.csproj" Condition="'$(UsePostgres)' == 'true'" />
   </ItemGroup>
   <ItemGroup>

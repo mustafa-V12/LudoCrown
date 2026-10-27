@@ -413,7 +413,7 @@ public sealed class InMemoryStore : IAccountStore, IProfileStore, IMatchStore, I
         lock (_gate) { _reports.Add(report); return Task.CompletedTask; }
     }
 
-    internal static string NewFriendCode()
+    public static string NewFriendCode()
     {
         Span<char> chars = stackalloc char[8];
         for (var i = 0; i < chars.Length; i++) chars[i] = RoomCodes.Alphabet[RandomNumberGenerator.GetInt32(RoomCodes.Alphabet.Length)];

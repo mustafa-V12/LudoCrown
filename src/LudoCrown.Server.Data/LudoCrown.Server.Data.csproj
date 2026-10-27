@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Persistence contracts (records + store interfaces) and the development in-memory store. No external packages. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>LudoCrown.Server.Data</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\LudoCrown.Core\LudoCrown.Core.csproj" />
+  </ItemGroup>
+</Project>
