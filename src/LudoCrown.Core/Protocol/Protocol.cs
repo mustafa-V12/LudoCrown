@@ -61,6 +61,9 @@ public sealed record MatchEndedInfo(string MatchId, IReadOnlyList<int> Standings
 
 public sealed record ServerError(ErrorCode Code, string Message);
 
+/// <summary>Result of a hub call that returns a value or an error.</summary>
+public sealed record HubResult<T>(T? Value, ServerError? Error);
+
 public sealed record ReactionInfo(int Seat, string ReactionId);
 
 public static class Reactions

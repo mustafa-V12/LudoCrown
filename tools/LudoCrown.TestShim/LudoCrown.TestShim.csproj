@@ -13,6 +13,7 @@
   <ItemGroup>
     <Compile Include="..\..\tests\LudoCrown.Core.Tests\**\*.cs" Exclude="..\..\tests\LudoCrown.Core.Tests\obj\**;..\..\tests\LudoCrown.Core.Tests\bin\**" LinkBase="Core.Tests" />
     <Compile Include="..\..\tests\LudoCrown.Server.Tests\**\*.cs" Exclude="..\..\tests\LudoCrown.Server.Tests\obj\**;..\..\tests\LudoCrown.Server.Tests\bin\**" LinkBase="Server.Tests" />
+    <Compile Include="..\..\tests\LudoCrown.App.Tests\**\*.cs" Exclude="..\..\tests\LudoCrown.App.Tests\obj\**;..\..\tests\LudoCrown.App.Tests\bin\**" LinkBase="App.Tests" />
   </ItemGroup>
   <!-- With -p:NpgsqlStub=true also compile the PostgreSQL integration tests (against the psql-backed stub). -->
   <ItemGroup Condition="'$(NpgsqlStub)' == 'true'">
@@ -26,5 +27,6 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="..\..\src\LudoCrown.Core\LudoCrown.Core.csproj" />
     <ProjectReference Include="..\..\src\LudoCrown.Server\LudoCrown.Server.csproj" />
+    <ProjectReference Include="..\..\src\LudoCrown.App.Logic\LudoCrown.App.Logic.csproj" />
   </ItemGroup>
 </Project>

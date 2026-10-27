@@ -92,8 +92,6 @@ public sealed class MatchHub(MatchService matches, MatchmakingService matchmakin
     }
 }
 
-public sealed record HubResult<T>(T? Value, ServerError? Error);
-
 /// <summary>Delivers server pushes to every connection of a user (SignalR maps users by the "sub" claim).</summary>
 public sealed class HubMatchNotifier(IHubContext<MatchHub> hub) : IMatchNotifier
 {

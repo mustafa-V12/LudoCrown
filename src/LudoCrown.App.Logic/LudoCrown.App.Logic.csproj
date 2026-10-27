@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Platform-independent app logic: view models, game sessions (offline + online), auth session, API client.
+    No MAUI or platform types — everything platform-specific is behind interfaces in /Services and implemented
+    in the MAUI project. This keeps the logic compilable and unit-testable on any machine.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>LudoCrown.App</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\LudoCrown.Core\LudoCrown.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="LudoCrown.App.Tests" />
+    <InternalsVisibleTo Include="LudoCrown.TestShim" />
+  </ItemGroup>
+</Project>
