@@ -12,7 +12,7 @@ public static class AccountEndpoints
     {
         var me = app.MapGroup("/me").RequireAuthorization().RequireRateLimiting("api");
 
-        me.MapGet("", async (HttpContext http, IAccountStore accounts, IProfileStore profiles, CancellationToken ct) =>
+        me.MapGet("", async (HttpContext http, IAccountStore accounts, IProfileStore profiles, IWalletStore wallet, CancellationToken ct) =>
         {
             var id = http.User.UserId();
             var user = await accounts.GetUserAsync(id, ct);
@@ -21,7 +21,8 @@ public static class AccountEndpoints
             var identities = await accounts.GetIdentitiesAsync(id, ct);
             return Results.Ok(new MeResponse(id, user.IsGuest, profile.DisplayName, profile.AvatarId, profile.FriendCode, profile.Level, profile.Xp,
                 profile.Level * Progression.XpPerLevel, await profiles.GetCoinsAsync(id, ct), await profiles.GetStatsAsync(id, ct),
-                identities.Select(i => i.Provider).Where(p => p != AuthProviders.Guest).Distinct().ToList()));
+                identities.Select(i => i.Provider).Where(p => p != AuthProviders.Guest).Distinct().ToList(),
+                await wallet.GetGemsAsync(id, ct)));
         });
 
         me.MapPatch("/profile", async (UpdateProfileRequest req, HttpContext http, IProfileStore profiles, TimeProvider time, CancellationToken ct) =>
@@ -33,6 +34,9 @@ public static class AccountEndpoints
             var p = await profiles.UpdateProfileAsync(http.User.UserId(), req.DisplayName?.Trim(), req.AvatarId, time.GetUtcNow(), ct);
             return Results.Ok(new { p.DisplayName, p.AvatarId });
         });
+
+        me.MapGet("/gems", async (HttpContext http, IWalletStore wallet, CancellationToken ct) =>
+            Results.Ok(new GemBalanceResponse(await wallet.GetGemsAsync(http.User.UserId(), ct))));
 
         me.MapGet("/matches", async (int? limit, HttpContext http, IMatchStore matches, CancellationToken ct) =>
             Results.Ok(await matches.GetHistoryAsync(http.User.UserId(), Math.Clamp(limit ?? 30, 1, 100), ct)));
@@ -129,6 +133,21 @@ public static class AccountEndpoints
             if (p is null) return Results.NotFound();
             var s = await profiles.GetStatsAsync(userId, ct);
             return Results.Ok(new PublicProfileResponse(p.UserId, p.DisplayName, p.AvatarId, p.Level, s.GamesPlayed, s.GamesWon));
+        }).RequireAuthorization().RequireRateLimiting("api");
+    }
+
+    /// <summary>
+    /// DEVELOPMENT ONLY. Lets a signed-in tester add gems to their OWN account to try rerolls. Mapped only when the server
+    /// runs in the Development environment with DevTools:AllowGemGrant=true (see Program.cs); never in production.
+    /// </summary>
+    public static void MapDevEndpoints(this WebApplication app)
+    {
+        app.MapPost("/dev/gems/grant", async (DevGrantRequest req, HttpContext http, IWalletStore wallet, TimeProvider time, CancellationToken ct) =>
+        {
+            if (req.Amount is < 1 or > Economy.MaxDevGrant)
+                return AuthEndpoints.Error(StatusCodes.Status400BadRequest, "invalid_amount", $"Grant between 1 and {Economy.MaxDevGrant} gems.");
+            var balance = await wallet.GrantGemsAsync(http.User.UserId(), req.Amount, Economy.Reasons.DevGrant, $"dev:{Guid.NewGuid():N}", time.GetUtcNow(), ct);
+            return Results.Ok(new GemBalanceResponse(balance));
         }).RequireAuthorization().RequireRateLimiting("api");
     }
 }

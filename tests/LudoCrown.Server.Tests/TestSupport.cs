@@ -73,7 +73,7 @@ public sealed class ServerHarness
     }
 
     public MatchService NewMatchService() =>
-        new(Store, Store, Store, Notifier, Dice, Microsoft.Extensions.Options.Options.Create(MatchOptions), Time, NullLogger<MatchService>.Instance);
+        new(Store, Store, Store, Store, Notifier, Dice, Microsoft.Extensions.Options.Options.Create(MatchOptions), Time, NullLogger<MatchService>.Instance);
 
     public async Task<Guid> NewUserAsync(string name = "Player")
     {
@@ -81,13 +81,19 @@ public sealed class ServerHarness
         return user.Id;
     }
 
-    public async Task<(Guid A, Guid B, Guid MatchId)> StartTwoPlayerAsync(bool connected = true)
+    public async Task<(Guid A, Guid B, Guid MatchId)> StartTwoPlayerAsync(bool connected = true, LudoCrown.Core.Model.GameMode mode = LudoCrown.Core.Model.GameMode.Classic)
     {
         var a = await NewUserAsync("Alice");
         var b = await NewUserAsync("Bob");
         if (connected) { await Matches.OnConnectedAsync(a); await Matches.OnConnectedAsync(b); }
-        var id = await Matches.StartMatchAsync(MatchMode.Matchmaking, new Guid?[] { a, b }, null);
+        var id = await Matches.StartMatchAsync(MatchMode.Matchmaking, new Guid?[] { a, b }, null, mode);
         return (a, b, id);
+    }
+
+    /// <summary>Removes gems from every human in a match so no-move rolls pass immediately (base turn-flow tests).</summary>
+    public void ZeroGems(Guid matchId)
+    {
+        foreach (var slot in Matches.GetRoom(matchId)!.Seats) slot.Gems = 0;
     }
 
     public async Task TickAsync(TimeSpan advance)

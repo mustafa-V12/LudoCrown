@@ -1,4 +1,5 @@
 using LudoCrown.Core.Engine;
+using LudoCrown.Core.Model;
 using LudoCrown.Core.Protocol;
 using LudoCrown.Server.Data;
 using LudoCrown.Server.Options;
@@ -7,7 +8,7 @@ using Microsoft.Extensions.Options;
 namespace LudoCrown.Server.Matches;
 
 /// <summary>
-/// Simple first-come matchmaking with one queue per player count (2 or 4). When a queue has enough
+/// Simple first-come matchmaking with one queue per player count (2 or 4) and game mode (Classic, Quick). When a queue has enough
 /// players a match starts. If someone waits longer than MatchmakingBotFillSeconds, the empty seats are
 /// filled with bots (shown as bots in the UI) so players are never stuck waiting.
 /// Players who have blocked each other are never placed in the same match.
@@ -15,77 +16,79 @@ namespace LudoCrown.Server.Matches;
 /// </summary>
 public sealed class MatchmakingService(MatchService matches, ISocialStore social, IMatchNotifier notifier, IOptions<MatchOptions> options, TimeProvider time)
 {
-    private sealed record Ticket(Guid UserId, int PlayerCount, DateTimeOffset EnqueuedAt);
+    private sealed record Ticket(Guid UserId, int PlayerCount, GameMode Mode, DateTimeOffset EnqueuedAt);
 
     private readonly object _gate = new();
     private readonly List<Ticket> _tickets = new();
 
     public int QueuedCount { get { lock (_gate) return _tickets.Count; } }
 
-    public async Task<(MatchmakingStatus? Status, ServerError? Error)> EnqueueAsync(Guid userId, int playerCount)
+    public async Task<(MatchmakingStatus? Status, ServerError? Error)> EnqueueAsync(Guid userId, int playerCount, GameMode mode = GameMode.Classic)
     {
+        if (!GameModes.IsAvailable(mode))
+            return (null, new ServerError(ErrorCode.InvalidMode, "That game mode isn't available."));
         if (CommandValidator.ValidatePlayerCount(playerCount) != ErrorCode.None)
             return (null, new ServerError(ErrorCode.InvalidRequest, "Choose a 2 or 4 player game."));
 
         if (matches.ActiveMatchFor(userId) is Guid existing)
-            return (new MatchmakingStatus(MatchmakingState.Matched, playerCount, playerCount, existing.ToString("N"), "You're already in a match."), null);
+            return (new MatchmakingStatus(MatchmakingState.Matched, playerCount, playerCount, existing.ToString("N"), "You're already in a match.", mode), null);
 
         int found;
         lock (_gate)
         {
             _tickets.RemoveAll(t => t.UserId == userId);
-            _tickets.Add(new Ticket(userId, playerCount, time.GetUtcNow()));
-            found = _tickets.Count(t => t.PlayerCount == playerCount);
+            _tickets.Add(new Ticket(userId, playerCount, mode, time.GetUtcNow()));
         }
 
-        await TryFormAsync(playerCount, fillWithBots: false);
+        await TryFormAsync(playerCount, mode, fillWithBots: false);
         lock (_gate)
         {
             if (!_tickets.Any(t => t.UserId == userId))
-                return (new MatchmakingStatus(MatchmakingState.Matched, playerCount, playerCount, matches.ActiveMatchFor(userId)?.ToString("N"), null), null);
-            found = _tickets.Count(t => t.PlayerCount == playerCount);
+                return (new MatchmakingStatus(MatchmakingState.Matched, playerCount, playerCount, matches.ActiveMatchFor(userId)?.ToString("N"), null, mode), null);
+            found = _tickets.Count(t => t.PlayerCount == playerCount && t.Mode == mode);
         }
-        var status = new MatchmakingStatus(MatchmakingState.Searching, playerCount, Math.Min(found, playerCount), null, null);
-        await NotifyQueueAsync(playerCount);
+        var status = new MatchmakingStatus(MatchmakingState.Searching, playerCount, Math.Min(found, playerCount), null, null, mode);
+        await NotifyQueueAsync(playerCount, mode);
         return (status, null);
     }
 
     public async Task CancelAsync(Guid userId)
     {
-        int? count = null;
+        Ticket? t;
         lock (_gate)
         {
-            var t = _tickets.FirstOrDefault(x => x.UserId == userId);
-            if (t is not null) { _tickets.Remove(t); count = t.PlayerCount; }
+            t = _tickets.FirstOrDefault(x => x.UserId == userId);
+            if (t is not null) _tickets.Remove(t);
         }
-        if (count is int c)
+        if (t is not null)
         {
-            await notifier.SendMatchmakingStatusAsync(userId, new MatchmakingStatus(MatchmakingState.Cancelled, c, 0, null, null));
-            await NotifyQueueAsync(c);
+            await notifier.SendMatchmakingStatusAsync(userId, new MatchmakingStatus(MatchmakingState.Cancelled, t.PlayerCount, 0, null, null, t.Mode));
+            await NotifyQueueAsync(t.PlayerCount, t.Mode);
         }
     }
 
     public async Task TickAsync()
     {
-        if (options.Value.MatchmakingBotFillSeconds <= 0) { await TryFormAsync(2, false); await TryFormAsync(4, false); return; }
         foreach (var count in new[] { 2, 4 })
+        foreach (var mode in GameModes.All.Select(m => m.Mode))
         {
             bool overdue;
             lock (_gate)
             {
-                var oldest = _tickets.Where(t => t.PlayerCount == count).OrderBy(t => t.EnqueuedAt).FirstOrDefault();
-                overdue = oldest is not null && time.GetUtcNow() - oldest.EnqueuedAt >= TimeSpan.FromSeconds(options.Value.MatchmakingBotFillSeconds);
+                var oldest = _tickets.Where(t => t.PlayerCount == count && t.Mode == mode).OrderBy(t => t.EnqueuedAt).FirstOrDefault();
+                overdue = options.Value.MatchmakingBotFillSeconds > 0 && oldest is not null
+                          && time.GetUtcNow() - oldest.EnqueuedAt >= TimeSpan.FromSeconds(options.Value.MatchmakingBotFillSeconds);
             }
-            await TryFormAsync(count, overdue);
+            await TryFormAsync(count, mode, overdue);
         }
     }
 
-    private async Task TryFormAsync(int playerCount, bool fillWithBots)
+    private async Task TryFormAsync(int playerCount, GameMode mode, bool fillWithBots)
     {
         while (true)
         {
             List<Ticket> candidates;
-            lock (_gate) candidates = _tickets.Where(t => t.PlayerCount == playerCount).OrderBy(t => t.EnqueuedAt).ToList();
+            lock (_gate) candidates = _tickets.Where(t => t.PlayerCount == playerCount && t.Mode == mode).OrderBy(t => t.EnqueuedAt).ToList();
             if (candidates.Count == 0) return;
 
             // Greedily build a group of players who have not blocked each other, oldest first.
@@ -112,19 +115,19 @@ public sealed class MatchmakingService(MatchService matches, ISocialStore social
             var seats = new List<Guid?>(group.Select(g => (Guid?)g.UserId));
             while (seats.Count < playerCount) seats.Add(null);
             Shuffle(seats);
-            var matchId = await matches.StartMatchAsync(MatchMode.Matchmaking, seats, null);
+            var matchId = await matches.StartMatchAsync(MatchMode.Matchmaking, seats, null, mode);
             foreach (var g in group)
-                await notifier.SendMatchmakingStatusAsync(g.UserId, new MatchmakingStatus(MatchmakingState.Matched, playerCount, group.Count, matchId.ToString("N"), null));
+                await notifier.SendMatchmakingStatusAsync(g.UserId, new MatchmakingStatus(MatchmakingState.Matched, playerCount, group.Count, matchId.ToString("N"), null, mode));
             fillWithBots = false; // only one bot-filled match per tick
         }
     }
 
-    private async Task NotifyQueueAsync(int playerCount)
+    private async Task NotifyQueueAsync(int playerCount, GameMode mode)
     {
         List<Guid> waiting;
-        lock (_gate) waiting = _tickets.Where(t => t.PlayerCount == playerCount).Select(t => t.UserId).ToList();
+        lock (_gate) waiting = _tickets.Where(t => t.PlayerCount == playerCount && t.Mode == mode).Select(t => t.UserId).ToList();
         foreach (var u in waiting)
-            await notifier.SendMatchmakingStatusAsync(u, new MatchmakingStatus(MatchmakingState.Searching, playerCount, Math.Min(waiting.Count, playerCount), null, null));
+            await notifier.SendMatchmakingStatusAsync(u, new MatchmakingStatus(MatchmakingState.Searching, playerCount, Math.Min(waiting.Count, playerCount), null, null, mode));
     }
 
     private static void Shuffle<T>(IList<T> list)

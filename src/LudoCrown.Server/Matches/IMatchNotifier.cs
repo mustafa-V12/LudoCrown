@@ -42,4 +42,8 @@ public static class RewardPolicy
         };
         return (coins, xp);
     }
+
+    /// <summary>Gems earned: 1 for winning a matchmaking match. Private tables and abandons earn none.</summary>
+    public static int GemsFor(Data.MatchMode mode, int placement, Data.ParticipantResult result) =>
+        mode == Data.MatchMode.Matchmaking && result == Data.ParticipantResult.Win && placement == 1 ? 1 : 0;
 }

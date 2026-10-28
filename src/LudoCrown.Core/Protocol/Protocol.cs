@@ -22,6 +22,8 @@ public static class HubNames
     public const string Resync = "Resync";
     public const string SendReaction = "SendReaction";
     public const string RequestRematch = "RequestRematch";
+    public const string Reroll = "Reroll";
+    public const string PassTurn = "PassTurn";
 
     // Server → client
     public const string OnMatchState = "MatchState";
@@ -33,7 +35,24 @@ public static class HubNames
 }
 
 /// <summary>Seat as shown to clients (no internal ids beyond the public player id).</summary>
-public sealed record SeatInfo(int Seat, PlayerColor Color, string DisplayName, string AvatarId, bool IsBot, bool IsConnected);
+public sealed record SeatInfo(int Seat, PlayerColor Color, string DisplayName, string AvatarId, bool IsBot, bool IsConnected, int RerollsUsed = 0);
+
+/// <summary>Why the reroll button is (un)available for the receiving player. Computed by the server.</summary>
+public enum RerollStatus
+{
+    /// <summary>A roll is pending, rerolls remain, and the player has enough gems.</summary>
+    Available,
+    NotYourTurn,
+    /// <summary>Nothing to reroll: roll first (or the roll was already used for a move).</summary>
+    RollFirst,
+    NoRerollsLeft,
+    InsufficientGems,
+    /// <summary>Match over, player left, or rerolls not offered (offline/bots).</summary>
+    Unavailable,
+}
+
+/// <summary>Result of a reroll request. On error nothing was charged.</summary>
+public sealed record RerollResult(ServerError? Error, int? GemBalance, int RerollsUsed, int RerollsRemaining, int? NewRoll);
 
 /// <summary>Full authoritative match state pushed to clients after every change.</summary>
 public sealed record MatchSnapshot(
@@ -49,15 +68,21 @@ public sealed record MatchSnapshot(
     int? WinnerSeat,
     int YourSeat,
     DateTimeOffset TurnDeadline,
-    IReadOnlyList<int> LegalPieces);
+    IReadOnlyList<int> LegalPieces,
+    GameMode Mode = GameMode.Classic,
+    int PiecesToWin = 4,
+    int MaxRerolls = 7,
+    RerollStatus RerollStatus = RerollStatus.Unavailable,
+    int? YourGems = null,
+    bool CanPass = false);
 
-public sealed record RoomInfo(string RoomId, string? Code, int PlayerCount, IReadOnlyList<SeatInfo> Seats, bool IsHost, bool Started, string? MatchId);
+public sealed record RoomInfo(string RoomId, string? Code, int PlayerCount, IReadOnlyList<SeatInfo> Seats, bool IsHost, bool Started, string? MatchId, GameMode Mode = GameMode.Classic);
 
 public enum MatchmakingState { Searching, Matched, Cancelled, Failed }
 
-public sealed record MatchmakingStatus(MatchmakingState State, int PlayerCount, int PlayersFound, string? MatchId, string? Message);
+public sealed record MatchmakingStatus(MatchmakingState State, int PlayerCount, int PlayersFound, string? MatchId, string? Message, GameMode Mode = GameMode.Classic);
 
-public sealed record MatchEndedInfo(string MatchId, IReadOnlyList<int> Standings, int YourPlacement, int CoinsAwarded, int XpAwarded, string Reason);
+public sealed record MatchEndedInfo(string MatchId, IReadOnlyList<int> Standings, int YourPlacement, int CoinsAwarded, int XpAwarded, string Reason, int GemsAwarded = 0, GameMode Mode = GameMode.Classic);
 
 public sealed record ServerError(ErrorCode Code, string Message);
 
@@ -85,6 +110,10 @@ public static class CommandValidator
 
     public static ErrorCode ValidatePlayerCount(int playerCount) =>
         playerCount is 2 or 4 ? ErrorCode.None : ErrorCode.InvalidRequest;
+
+    /// <summary>Client-generated idempotency key for retryable actions (a GUID).</summary>
+    public static ErrorCode ValidateRequestId(string? requestId) =>
+        Guid.TryParse(requestId, out var g) && g != Guid.Empty ? ErrorCode.None : ErrorCode.InvalidRequest;
 
     public static ErrorCode ValidateMatchId(string? matchId) =>
         !string.IsNullOrWhiteSpace(matchId) && matchId.Length <= 64 && matchId.All(c => char.IsAsciiLetterOrDigit(c) || c == '-')

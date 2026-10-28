@@ -38,6 +38,21 @@ public interface IProfileStore
     Task<long> GetCoinsAsync(Guid userId, CancellationToken ct = default);
 }
 
+/// <summary>Gem balances. All changes are atomic and recorded in the ledger.</summary>
+public interface IWalletStore
+{
+    Task<long> GetGemsAsync(Guid userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Spends <paramref name="cost"/> gems exactly once per <paramref name="idempotencyKey"/>. Retrying with the same key
+    /// returns <see cref="GemSpendOutcome.AlreadySpent"/> without charging again. Never lets a balance go negative.
+    /// </summary>
+    Task<GemSpendResult> SpendGemsAsync(Guid userId, Guid? matchId, string idempotencyKey, int cost, string reason, DateTimeOffset at, CancellationToken ct = default);
+
+    /// <summary>Adds gems (starter grant, dev grant). Idempotent per key. Returns the new balance.</summary>
+    Task<long> GrantGemsAsync(Guid userId, int amount, string reason, string idempotencyKey, DateTimeOffset at, CancellationToken ct = default);
+}
+
 public interface IMatchStore
 {
     Task CreateMatchAsync(MatchRecord match, string initialStateJson, CancellationToken ct = default);

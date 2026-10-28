@@ -45,15 +45,18 @@ public enum ParticipantResult { Win, Loss, Abandoned }
 
 public sealed record MatchParticipantRecord(int Seat, Guid? UserId, bool IsBot, string DisplayName, string Color);
 
-public sealed record MatchRecord(Guid Id, MatchMode Mode, int PlayerCount, string? RoomCode, DateTimeOffset StartedAt, IReadOnlyList<MatchParticipantRecord> Participants);
+public sealed record MatchRecord(Guid Id, MatchMode Mode, int PlayerCount, string? RoomCode, DateTimeOffset StartedAt, IReadOnlyList<MatchParticipantRecord> Participants,
+    LudoCrown.Core.Model.GameMode GameMode = LudoCrown.Core.Model.GameMode.Classic);
 
-public sealed record ParticipantOutcome(int Seat, Guid? UserId, int Placement, ParticipantResult Result, int CoinsAwarded, int XpAwarded, int PiecesCaptured);
+public sealed record ParticipantOutcome(int Seat, Guid? UserId, int Placement, ParticipantResult Result, int CoinsAwarded, int XpAwarded, int PiecesCaptured,
+    int GemsAwarded = 0, int RerollsUsed = 0);
 
 public sealed record MatchCompletion(Guid MatchId, MatchStatus Status, DateTimeOffset EndedAt, Guid? WinnerUserId, string FinalStateJson, IReadOnlyList<ParticipantOutcome> Outcomes, int PlayerCount);
 
 public sealed record ActiveMatchRecord(MatchRecord Match, string StateJson);
 
-public sealed record MatchHistoryItem(Guid MatchId, MatchMode Mode, int PlayerCount, DateTimeOffset StartedAt, DateTimeOffset? EndedAt, int Placement, ParticipantResult Result, int CoinsAwarded, int XpAwarded, IReadOnlyList<string> Opponents);
+public sealed record MatchHistoryItem(Guid MatchId, MatchMode Mode, int PlayerCount, DateTimeOffset StartedAt, DateTimeOffset? EndedAt, int Placement, ParticipantResult Result, int CoinsAwarded, int XpAwarded, IReadOnlyList<string> Opponents,
+    LudoCrown.Core.Model.GameMode GameMode = LudoCrown.Core.Model.GameMode.Classic, int RerollsUsed = 0, int GemsAwarded = 0);
 
 public enum FriendshipStatus { Pending, Accepted }
 
@@ -67,6 +70,33 @@ public static class ReportReasons
 public sealed record ReportRecord(Guid Id, Guid ReporterId, Guid ReportedId, Guid? MatchId, string Reason, string? Details, DateTimeOffset CreatedAt);
 
 public sealed record AccountExport(UserRecord User, IReadOnlyList<IdentityRecord> Identities, ProfileRecord? Profile, StatsRecord Stats, long Coins, IReadOnlyList<MatchHistoryItem> Matches, IReadOnlyList<FriendRecord> Friends, IReadOnlyList<Guid> Blocked);
+
+/// <summary>
+/// Gem economy. Gems are earned (starter grant, online wins) and spent on rerolls. There are no real-money
+/// purchases. Balances live only in the server database; clients can never write them.
+/// </summary>
+public static class Economy
+{
+    public const int StarterGems = 10;
+    public const int MaxDevGrant = 100;
+
+    public static class Reasons
+    {
+        public const string MatchReward = "match_reward";
+        public const string Reroll = "reroll";
+        public const string StarterGrant = "starter_grant";
+        public const string DevGrant = "dev_grant";
+        public const string AdminAdjustment = "admin_adjustment";
+    }
+}
+
+public enum GemSpendOutcome { Spent, AlreadySpent, InsufficientGems, UnknownUser }
+
+/// <summary>Result of an idempotent gem spend. <see cref="Balance"/> is the balance after the operation.</summary>
+public sealed record GemSpendResult(GemSpendOutcome Outcome, long Balance)
+{
+    public bool Charged => Outcome is GemSpendOutcome.Spent or GemSpendOutcome.AlreadySpent;
+}
 
 public static class Progression
 {

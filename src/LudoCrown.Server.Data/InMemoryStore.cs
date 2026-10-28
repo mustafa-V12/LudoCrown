@@ -8,7 +8,7 @@ namespace LudoCrown.Server.Data;
 /// Production uses the PostgreSQL store (LudoCrown.Server.Postgres). The server refuses to start
 /// with this store outside Development unless explicitly allowed (see Program.cs).
 /// </summary>
-public sealed class InMemoryStore : IAccountStore, IProfileStore, IMatchStore, ISocialStore
+public sealed class InMemoryStore : IAccountStore, IProfileStore, IMatchStore, ISocialStore, IWalletStore
 {
     private readonly object _gate = new();
     private readonly TimeProvider _time;
@@ -18,6 +18,9 @@ public sealed class InMemoryStore : IAccountStore, IProfileStore, IMatchStore, I
     private readonly Dictionary<Guid, ProfileRecord> _profiles = new();
     private readonly Dictionary<Guid, StatsRecord> _stats = new();
     private readonly Dictionary<Guid, long> _coins = new();
+    private readonly Dictionary<Guid, long> _gems = new();
+    private readonly HashSet<(Guid User, string Key)> _ledgerKeys = new();
+    public List<(Guid User, long Delta, string Reason, Guid? MatchId)> GemLedger { get; } = new();
     private readonly Dictionary<Guid, RefreshTokenRecord> _refresh = new();
     private readonly Dictionary<Guid, (AuthCodeRecord Code, bool Consumed)> _codes = new();
 
@@ -55,6 +58,9 @@ public sealed class InMemoryStore : IAccountStore, IProfileStore, IMatchStore, I
             _profiles[user.Id] = new ProfileRecord(user.Id, displayName, avatarId, code, 0, now);
             _stats[user.Id] = StatsRecord.Empty(user.Id);
             _coins[user.Id] = 0;
+            _gems[user.Id] = Economy.StarterGems;
+            _ledgerKeys.Add((user.Id, "starter"));
+            GemLedger.Add((user.Id, Economy.StarterGems, Economy.Reasons.StarterGrant, null));
             return Task.FromResult(user);
         }
     }
@@ -103,6 +109,9 @@ public sealed class InMemoryStore : IAccountStore, IProfileStore, IMatchStore, I
             _profiles.Remove(userId);
             _stats.Remove(userId);
             _coins.Remove(userId);
+            _gems.Remove(userId);
+            _ledgerKeys.RemoveWhere(k => k.User == userId);
+            GemLedger.RemoveAll(l => l.User == userId);
             foreach (var key in _refresh.Where(r => r.Value.UserId == userId).Select(r => r.Key).ToList()) _refresh.Remove(key);
             foreach (var key in _friends.Keys.Where(k => k.Low == userId || k.High == userId).ToList()) _friends.Remove(key);
             _blocks.RemoveWhere(b => b.Blocker == userId || b.Blocked == userId);
@@ -234,6 +243,43 @@ public sealed class InMemoryStore : IAccountStore, IProfileStore, IMatchStore, I
         lock (_gate) return Task.FromResult(_coins.GetValueOrDefault(userId));
     }
 
+    // ---------- gems ----------
+
+    public Task<long> GetGemsAsync(Guid userId, CancellationToken ct = default)
+    {
+        lock (_gate) return Task.FromResult(_gems.GetValueOrDefault(userId));
+    }
+
+    public Task<GemSpendResult> SpendGemsAsync(Guid userId, Guid? matchId, string idempotencyKey, int cost, string reason, DateTimeOffset at, CancellationToken ct = default)
+    {
+        if (cost <= 0) throw new ArgumentOutOfRangeException(nameof(cost));
+        lock (_gate)
+        {
+            if (!_gems.TryGetValue(userId, out var balance)) return Task.FromResult(new GemSpendResult(GemSpendOutcome.UnknownUser, 0));
+            if (_ledgerKeys.Contains((userId, idempotencyKey))) return Task.FromResult(new GemSpendResult(GemSpendOutcome.AlreadySpent, balance));
+            if (balance < cost) return Task.FromResult(new GemSpendResult(GemSpendOutcome.InsufficientGems, balance));
+            _gems[userId] = balance - cost;
+            _ledgerKeys.Add((userId, idempotencyKey));
+            GemLedger.Add((userId, -cost, reason, matchId));
+            return Task.FromResult(new GemSpendResult(GemSpendOutcome.Spent, balance - cost));
+        }
+    }
+
+    public Task<long> GrantGemsAsync(Guid userId, int amount, string reason, string idempotencyKey, DateTimeOffset at, CancellationToken ct = default)
+    {
+        if (amount <= 0) throw new ArgumentOutOfRangeException(nameof(amount));
+        lock (_gate)
+        {
+            if (!_gems.ContainsKey(userId)) throw new InvalidOperationException("Unknown user.");
+            if (_ledgerKeys.Add((userId, idempotencyKey)))
+            {
+                _gems[userId] += amount;
+                GemLedger.Add((userId, amount, reason, null));
+            }
+            return Task.FromResult(_gems[userId]);
+        }
+    }
+
     // ---------- matches ----------
 
     public Task CreateMatchAsync(MatchRecord match, string initialStateJson, CancellationToken ct = default)
@@ -286,6 +332,11 @@ public sealed class InMemoryStore : IAccountStore, IProfileStore, IMatchStore, I
                     BestWinStreak = Math.Max(s.BestWinStreak, streak),
                 };
                 _coins[id] = _coins.GetValueOrDefault(id) + o.CoinsAwarded;
+                if (o.GemsAwarded > 0 && _ledgerKeys.Add((id, $"reward:{c.MatchId}")))
+                {
+                    _gems[id] = _gems.GetValueOrDefault(id) + o.GemsAwarded;
+                    GemLedger.Add((id, o.GemsAwarded, Economy.Reasons.MatchReward, c.MatchId));
+                }
                 if (_profiles.TryGetValue(id, out var p)) _profiles[id] = p with { Xp = p.Xp + o.XpAwarded };
             }
             return Task.FromResult(true);
@@ -314,7 +365,8 @@ public sealed class InMemoryStore : IAccountStore, IProfileStore, IMatchStore, I
                 {
                     var me = m.Outcomes.First(o => o.UserId == userId);
                     var opponents = m.Participants.Where(p => p.Seat != me.Seat).Select(p => p.DisplayName).ToList();
-                    return new MatchHistoryItem(m.Match.Id, m.Match.Mode, m.Match.PlayerCount, m.Match.StartedAt, m.EndedAt, me.Placement, me.Result, me.CoinsAwarded, me.XpAwarded, opponents);
+                    return new MatchHistoryItem(m.Match.Id, m.Match.Mode, m.Match.PlayerCount, m.Match.StartedAt, m.EndedAt, me.Placement, me.Result, me.CoinsAwarded, me.XpAwarded, opponents,
+                        m.Match.GameMode, me.RerollsUsed, me.GemsAwarded);
                 })
                 .ToList();
             return Task.FromResult(list);

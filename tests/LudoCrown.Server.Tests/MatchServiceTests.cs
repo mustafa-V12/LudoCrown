@@ -87,6 +87,7 @@ public class MatchServiceTests
     {
         var h = new ServerHarness();
         var (a, b, id) = await h.StartTwoPlayerAsync();
+        h.ZeroGems(id);
         var room = h.Matches.GetRoom(id)!;
         var match = id.ToString("N");
 
@@ -114,6 +115,7 @@ public class MatchServiceTests
     {
         var h = new ServerHarness();
         var (a, b, id) = await h.StartTwoPlayerAsync();
+        h.ZeroGems(id);
         var room = h.Matches.GetRoom(id)!;
         h.Dice.Enqueue(2);
         await h.TickAsync(TimeSpan.FromSeconds(21));
@@ -152,6 +154,7 @@ public class MatchServiceTests
     {
         var h = new ServerHarness();
         var (a, b, id) = await h.StartTwoPlayerAsync();
+        h.ZeroGems(id);
         var room = h.Matches.GetRoom(id)!;
         await h.Matches.OnDisconnectedAsync(b);
         for (var i = 0; i < 95 && !room.Ended; i++)
@@ -228,6 +231,7 @@ public class MatchServiceTests
         await h.Matches.OnConnectedAsync(a);
         var id = await h.Matches.StartMatchAsync(MatchMode.Matchmaking, new Guid?[] { a, null }, null);
         var room = h.Matches.GetRoom(id)!;
+        h.ZeroGems(id);
         h.Dice.Enqueue(2); // Alice: no move
         await h.Matches.RollAsync(a, id.ToString("N"), 0);
         Assert.Equal(1, room.State.CurrentPlayer.Seat);

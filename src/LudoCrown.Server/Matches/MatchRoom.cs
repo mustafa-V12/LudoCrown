@@ -23,6 +23,8 @@ public sealed class SeatSlot
     public int LastMissedTurnNumber { get; set; } = -1;
     public int Captures { get; set; }
     public DateTimeOffset LastReactionAt { get; set; } = DateTimeOffset.MinValue;
+    /// <summary>Server-side cache of the player's gem balance (source of truth is the wallet store).</summary>
+    public long Gems { get; set; }
 
     public bool IsHuman => !IsBot && UserId is not null;
     /// <summary>True when the server plays this seat (bots and abandoned humans).</summary>
@@ -45,6 +47,8 @@ public sealed class MatchRoom
     public DateTimeOffset? EndedAt { get; set; }
     public IReadOnlyList<int> FinalStandings { get; set; } = Array.Empty<int>();
     public required IBotStrategy Bot { get; init; }
+    /// <summary>Answers to reroll requests already handled in this match, keyed by user + request id (idempotency).</summary>
+    public Dictionary<string, RerollResult> ProcessedRerolls { get; } = new();
 
     public string MatchIdString => Id.ToString("N");
 
@@ -54,8 +58,20 @@ public sealed class MatchRoom
 
     public SeatSlot CurrentSlot => Seats[State.CurrentPlayer.Seat];
 
+    /// <summary>Why the given player can or cannot reroll right now.</summary>
+    public RerollStatus RerollStatusFor(SeatSlot? slot)
+    {
+        if (slot is null || Ended || slot.Abandoned || !slot.IsHuman) return RerollStatus.Unavailable;
+        if (State.CurrentPlayer.Seat != slot.Seat) return RerollStatus.NotYourTurn;
+        if (State.Phase != GamePhase.AwaitingMove || State.PendingRoll is null) return RerollStatus.RollFirst;
+        if (State.Players[slot.Seat].RerollsUsed >= State.Rules.MaxRerolls) return RerollStatus.NoRerollsLeft;
+        if (slot.Gems < GameModes.RerollGemCost) return RerollStatus.InsufficientGems;
+        return RerollStatus.Available;
+    }
+
     public MatchSnapshot SnapshotFor(Guid? userId)
     {
+        var yourSlot = userId is Guid uid ? SeatOf(uid) : null;
         var yourSeat = userId is Guid id ? SeatOf(id)?.Seat ?? -1 : -1;
         var legal = !Ended && yourSeat == State.CurrentPlayer.Seat && State.Phase == GamePhase.AwaitingMove
             ? GameEngine.GetLegalMoves(State).Select(m => m.Piece).ToList()
@@ -73,7 +89,13 @@ public sealed class MatchRoom
             State.WinnerSeat,
             yourSeat,
             Deadline,
-            legal);
+            legal,
+            State.Rules.Mode,
+            State.Rules.PiecesToWin,
+            State.Rules.MaxRerolls,
+            RerollStatusFor(yourSlot),
+            yourSlot is { IsHuman: true } ? (int)yourSlot.Gems : null,
+            !Ended && yourSeat == State.CurrentPlayer.Seat && GameEngine.IsHeldWithoutMoves(State));
     }
 
     public IReadOnlyList<SeatInfo> SeatInfos() => Seats.Select(s => new SeatInfo(
@@ -82,5 +104,6 @@ public sealed class MatchRoom
         s.DisplayName,
         s.AvatarId,
         s.ServerControlled,
-        s.IsBot || (s.Connected && !s.Abandoned))).ToList();
+        s.IsBot || (s.Connected && !s.Abandoned),
+        State.Players[s.Seat].RerollsUsed)).ToList();
 }

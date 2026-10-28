@@ -71,6 +71,11 @@ public sealed class MatchOptions
     public double DisconnectGraceSeconds { get; set; } = 90;
     /// <summary>Consecutive timed-out turns before a connected-but-idle player is marked abandoned.</summary>
     public int MaxMissedTurns { get; set; } = 3;
+    /// <summary>
+    /// Decision window after a roll with no legal move when the player could pay for a reroll. The roll is held so
+    /// they can reroll (gem) or pass; when the window ends it is passed automatically (not counted as a missed turn).
+    /// </summary>
+    public double HeldRollSeconds { get; set; } = 5;
     /// <summary>Pause before bots act, so moves are readable.</summary>
     public double BotDelaySeconds { get; set; } = 1.0;
     /// <summary>Matchmaking fills empty seats with clearly-labelled bots after this wait. 0 disables.</summary>

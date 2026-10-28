@@ -19,6 +19,7 @@ public sealed class PrivateRoomService(MatchService matches, IProfileStore profi
         public Guid Id { get; } = Guid.NewGuid();
         public required string Code { get; init; }
         public required int PlayerCount { get; init; }
+        public required GameMode Mode { get; init; }
         public Guid Host { get; set; }
         public List<Guid> Members { get; } = new();
         public DateTimeOffset LastActivity { get; set; }
@@ -28,11 +29,12 @@ public sealed class PrivateRoomService(MatchService matches, IProfileStore profi
     private readonly object _gate = new();
     private readonly Dictionary<Guid, Room> _rooms = new();
     /// <summary>Finished private matches → who played, for rematches.</summary>
-    private readonly Dictionary<Guid, (int PlayerCount, List<Guid> Members)> _played = new();
+    private readonly Dictionary<Guid, (int PlayerCount, List<Guid> Members, GameMode Mode)> _played = new();
 
-    public async Task<(RoomInfo? Room, ServerError? Error)> CreateAsync(Guid host, int playerCount)
+    public async Task<(RoomInfo? Room, ServerError? Error)> CreateAsync(Guid host, int playerCount, GameMode mode = GameMode.Classic)
     {
         if (CommandValidator.ValidatePlayerCount(playerCount) != ErrorCode.None) return (null, new ServerError(ErrorCode.InvalidRequest, "Choose 2 or 4 players."));
+        if (!GameModes.IsAvailable(mode)) return (null, new ServerError(ErrorCode.InvalidMode, "That game mode isn't available."));
         if (matches.ActiveMatchFor(host) is not null) return (null, new ServerError(ErrorCode.InvalidRequest, "Finish your current match first."));
         Room room;
         lock (_gate)
@@ -40,7 +42,7 @@ public sealed class PrivateRoomService(MatchService matches, IProfileStore profi
             RemoveFromRoomsLocked(host);
             string code;
             do code = RoomCodes.Generate(); while (_rooms.Values.Any(r => r.Code == code));
-            room = new Room { Code = code, PlayerCount = playerCount, Host = host, LastActivity = time.GetUtcNow() };
+            room = new Room { Code = code, PlayerCount = playerCount, Mode = mode, Host = host, LastActivity = time.GetUtcNow() };
             room.Members.Add(host);
             _rooms[room.Id] = room;
         }
@@ -108,12 +110,12 @@ public sealed class PrivateRoomService(MatchService matches, IProfileStore profi
 
         var seats = members.Select(m => (Guid?)m).ToList();
         while (seats.Count < room.PlayerCount) seats.Add(null);
-        var matchId = await matches.StartMatchAsync(MatchMode.Private, seats, room.Code);
+        var matchId = await matches.StartMatchAsync(MatchMode.Private, seats, room.Code, room.Mode);
         lock (_gate)
         {
             room.MatchId = matchId;
             _rooms.Remove(room.Id);
-            _played[matchId] = (room.PlayerCount, members);
+            _played[matchId] = (room.PlayerCount, members, room.Mode);
         }
         await BroadcastAsync(room);
         return (matchId.ToString("N"), null);
@@ -123,7 +125,7 @@ public sealed class PrivateRoomService(MatchService matches, IProfileStore profi
     public async Task<(RoomInfo? Room, ServerError? Error)> RematchAsync(Guid user, string? matchId)
     {
         if (!Guid.TryParse(matchId, out var id)) return (null, new ServerError(ErrorCode.UnknownMatch, "Match not found."));
-        (int PlayerCount, List<Guid> Members) played;
+        (int PlayerCount, List<Guid> Members, GameMode Mode) played;
         Room? existing;
         lock (_gate)
         {
@@ -135,7 +137,7 @@ public sealed class PrivateRoomService(MatchService matches, IProfileStore profi
         }
         if (existing is not null) return (await InfoAsync(existing, user), null);
 
-        var (info, error) = await CreateAsync(user, played.PlayerCount);
+        var (info, error) = await CreateAsync(user, played.PlayerCount, played.Mode);
         if (info is null) return (null, error);
         Room room;
         lock (_gate)
@@ -198,6 +200,6 @@ public sealed class PrivateRoomService(MatchService matches, IProfileStore profi
             : new[] { PlayerColor.Ruby, PlayerColor.Emerald, PlayerColor.Topaz, PlayerColor.Sapphire };
         var seats = members.Select((m, i) => new SeatInfo(i, colors[i], map.GetValueOrDefault(m)?.DisplayName ?? "Player", map.GetValueOrDefault(m)?.AvatarId ?? "crown", false, matches.IsConnected(m))).ToList();
         var started = matchId is not null && matchId != Guid.Empty;
-        return new RoomInfo(room.Id.ToString(), room.Code, room.PlayerCount, seats, host == viewer, started, started ? matchId!.Value.ToString("N") : null);
+        return new RoomInfo(room.Id.ToString(), room.Code, room.PlayerCount, seats, host == viewer, started, started ? matchId!.Value.ToString("N") : null, room.Mode);
     }
 }

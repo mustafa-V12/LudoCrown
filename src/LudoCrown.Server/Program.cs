@@ -58,6 +58,7 @@ else
     builder.Services.AddSingleton<IProfileStore>(sp => sp.GetRequiredService<InMemoryStore>());
     builder.Services.AddSingleton<IMatchStore>(sp => sp.GetRequiredService<InMemoryStore>());
     builder.Services.AddSingleton<ISocialStore>(sp => sp.GetRequiredService<InMemoryStore>());
+    builder.Services.AddSingleton<IWalletStore>(sp => sp.GetRequiredService<InMemoryStore>());
 }
 
 // ---------- auth ----------
@@ -122,11 +123,25 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapGet("/", () => Results.Ok(new { service = "Ludo Crown server", status = "ok" }));
+app.MapGet("/", () => Results.Ok(new { service = "Ludo Crown server", status = "ok", environment = app.Environment.EnvironmentName }));
+app.MapGet("/info", (IConfiguration c) => Results.Ok(new
+{
+    environment = app.Environment.EnvironmentName,
+    storage = string.IsNullOrWhiteSpace(c.GetConnectionString("Postgres")) ? "in-memory (development, data resets on restart)" : "postgresql",
+    modes = LudoCrown.Core.Model.GameModes.All.Select(m => new { m.Id, m.Name, m.WinCondition, m.MaxRerolls, m.PiecesToWin }),
+    rerollGemCost = LudoCrown.Core.Model.GameModes.RerollGemCost,
+    devGemGrant = app.Environment.IsDevelopment() && c.GetValue("DevTools:AllowGemGrant", false),
+}));
 app.MapHealthChecks("/health");
 app.MapGet("/stats/live", (MatchService m, MatchmakingService mm) => Results.Ok(new { liveMatches = m.LiveMatchCount, queued = mm.QueuedCount }));
 app.MapAuthEndpoints();
 app.MapAccountEndpoints();
+// Development-only tools (test gem grant). Never mapped outside the Development environment.
+if (app.Environment.IsDevelopment() && config.GetValue("DevTools:AllowGemGrant", false))
+{
+    app.MapDevEndpoints();
+    app.Logger.LogWarning("DEVELOPMENT ONLY: /dev/gems/grant is enabled. It is never available in Production.");
+}
 app.MapHub<MatchHub>(HubNames.Path);
 
 var auth = app.Services.GetRequiredService<IOptions<AuthOptions>>().Value;

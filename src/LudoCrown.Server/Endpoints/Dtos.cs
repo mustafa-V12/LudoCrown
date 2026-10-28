@@ -29,7 +29,11 @@ public sealed record MeResponse(
     int XpForNextLevel,
     long Coins,
     StatsRecord Stats,
-    IReadOnlyList<string> LinkedProviders);
+    IReadOnlyList<string> LinkedProviders,
+    long Gems = 0);
+
+public sealed record DevGrantRequest(int Amount);
+public sealed record GemBalanceResponse(long Gems);
 
 public sealed record UpdateProfileRequest(string? DisplayName, string? AvatarId);
 public sealed record DeleteAccountRequest(string? AppleAuthorizationCode);

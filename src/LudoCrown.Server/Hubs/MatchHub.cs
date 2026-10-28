@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using LudoCrown.Core.Engine;
+using LudoCrown.Core.Model;
 using LudoCrown.Core.Protocol;
 using LudoCrown.Server.Auth;
 using LudoCrown.Server.Matches;
@@ -35,19 +36,23 @@ public sealed class MatchHub(MatchService matches, MatchmakingService matchmakin
     }
 
     [HubMethodName(HubNames.FindMatch)]
-    public async Task<MatchmakingStatus> FindMatch(int playerCount)
+    public async Task<MatchmakingStatus> FindMatch(int playerCount, string mode)
     {
-        var (status, error) = await matchmaking.EnqueueAsync(UserId, playerCount);
-        return status ?? new MatchmakingStatus(MatchmakingState.Failed, playerCount, 0, null, error?.Message);
+        if (GameModes.Parse(mode) is not GameMode gameMode)
+            return new MatchmakingStatus(MatchmakingState.Failed, playerCount, 0, null, "That game mode isn't available.");
+        var (status, error) = await matchmaking.EnqueueAsync(UserId, playerCount, gameMode);
+        return status ?? new MatchmakingStatus(MatchmakingState.Failed, playerCount, 0, null, error?.Message, gameMode);
     }
 
     [HubMethodName(HubNames.CancelMatchmaking)]
     public Task CancelMatchmaking() => matchmaking.CancelAsync(UserId);
 
     [HubMethodName(HubNames.CreatePrivateRoom)]
-    public async Task<HubResult<RoomInfo>> CreatePrivateRoom(int playerCount)
+    public async Task<HubResult<RoomInfo>> CreatePrivateRoom(int playerCount, string mode)
     {
-        var (room, error) = await rooms.CreateAsync(UserId, playerCount);
+        if (GameModes.Parse(mode) is not GameMode gameMode)
+            return new HubResult<RoomInfo>(null, new ServerError(ErrorCode.InvalidMode, "That game mode isn't available."));
+        var (room, error) = await rooms.CreateAsync(UserId, playerCount, gameMode);
         return new HubResult<RoomInfo>(room, error);
     }
 
@@ -77,6 +82,13 @@ public sealed class MatchHub(MatchService matches, MatchmakingService matchmakin
 
     [HubMethodName(HubNames.Move)]
     public Task<ServerError?> Move(string matchId, int pieceIndex, long expectedVersion) => matches.MoveAsync(UserId, matchId, pieceIndex, expectedVersion);
+
+    /// <summary>Gem reroll of the pending roll. <paramref name="requestId"/> is a client GUID reused on retries (idempotency).</summary>
+    [HubMethodName(HubNames.Reroll)]
+    public Task<RerollResult> Reroll(string matchId, long expectedVersion, string requestId) => matches.RerollAsync(UserId, matchId, expectedVersion, requestId);
+
+    [HubMethodName(HubNames.PassTurn)]
+    public Task<ServerError?> PassTurn(string matchId, long expectedVersion) => matches.PassAsync(UserId, matchId, expectedVersion);
 
     [HubMethodName(HubNames.Resync)]
     public Task<MatchSnapshot?> Resync(string? matchId) => matches.ResyncAsync(UserId, matchId);

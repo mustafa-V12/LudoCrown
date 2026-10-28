@@ -22,6 +22,7 @@ namespace LudoCrown.Server.Matches;
 public sealed class MatchService(
     IMatchStore store,
     IProfileStore profiles,
+    IWalletStore wallet,
     ISocialStore social,
     IMatchNotifier notifier,
     IDiceRoller dice,
@@ -44,8 +45,8 @@ public sealed class MatchService(
 
     public bool IsConnected(Guid userId) => _connections.GetValueOrDefault(userId) > 0;
 
-    /// <summary>Starts a match. A null entry in <paramref name="seatUsers"/> is a bot seat.</summary>
-    public async Task<Guid> StartMatchAsync(MatchMode mode, IReadOnlyList<Guid?> seatUsers, string? roomCode, CancellationToken ct = default)
+    /// <summary>Starts a match. A null entry in <paramref name="seatUsers"/> is a bot seat. The game mode is fixed for the whole match.</summary>
+    public async Task<Guid> StartMatchAsync(MatchMode mode, IReadOnlyList<Guid?> seatUsers, string? roomCode, GameMode gameMode = GameMode.Classic, CancellationToken ct = default)
     {
         var now = time.GetUtcNow();
         var matchId = Guid.NewGuid();
@@ -63,7 +64,9 @@ public sealed class MatchService(
             return new SeatSlot { Seat = i, IsBot = true, DisplayName = BotNames[(botIndex + i) % BotNames.Length], AvatarId = Avatars.All[(botIndex + i) % Avatars.All.Count], Connected = true };
         }).ToArray();
 
-        var state = GameSetup.NewGame(matchId.ToString("N"), slots.Select(s => new SeatSetup(s.UserId?.ToString() ?? $"bot-{s.Seat}", s.DisplayName, s.IsBot ? PlayerKind.Bot : PlayerKind.Remote)).ToList());
+        var state = GameSetup.NewGame(matchId.ToString("N"), slots.Select(s => new SeatSetup(s.UserId?.ToString() ?? $"bot-{s.Seat}", s.DisplayName, s.IsBot ? PlayerKind.Bot : PlayerKind.Remote)).ToList(),
+            RuleSet.ForMode(gameMode));
+        foreach (var slot in slots.Where(s => s.IsHuman)) slot.Gems = await wallet.GetGemsAsync(slot.UserId!.Value, ct);
         var room = new MatchRoom
         {
             Id = matchId,
@@ -77,7 +80,7 @@ public sealed class MatchService(
         room.Deadline = ComputeDeadline(room, now);
 
         var record = new MatchRecord(matchId, mode, slots.Length, roomCode, now,
-            slots.Select(s => new MatchParticipantRecord(s.Seat, s.UserId, s.IsBot, s.DisplayName, state.Players[s.Seat].Color.ToString())).ToList());
+            slots.Select(s => new MatchParticipantRecord(s.Seat, s.UserId, s.IsBot, s.DisplayName, state.Players[s.Seat].Color.ToString())).ToList(), gameMode);
         await store.CreateMatchAsync(record, GameStateSerializer.Serialize(state), ct);
 
         _rooms[matchId] = room;
@@ -90,13 +93,89 @@ public sealed class MatchService(
         return matchId;
     }
 
+    /// <summary>
+    /// Rolls for the player. If the roll has no legal move and the player can afford a reroll, the roll is held so they
+    /// can choose to reroll (gem) or pass; otherwise the turn passes immediately as in the base rules.
+    /// </summary>
     public Task<ServerError?> RollAsync(Guid userId, string matchId, long expectedVersion) =>
-        HumanCommandAsync(userId, matchId, expectedVersion, (room, seat) => GameEngine.Roll(room.State, seat, dice));
+        HumanCommandAsync(userId, matchId, expectedVersion, (room, slot) => GameEngine.Roll(room.State, slot.Seat, dice, CanAffordReroll(room, slot, afterSpending: 0)));
 
     public Task<ServerError?> MoveAsync(Guid userId, string matchId, int pieceIndex, long expectedVersion) =>
-        HumanCommandAsync(userId, matchId, expectedVersion, (room, seat) => GameEngine.Move(room.State, seat, pieceIndex));
+        HumanCommandAsync(userId, matchId, expectedVersion, (room, slot) => GameEngine.Move(room.State, slot.Seat, pieceIndex));
 
-    private async Task<ServerError?> HumanCommandAsync(Guid userId, string matchId, long expectedVersion, Func<MatchRoom, int, EngineResult> action)
+    /// <summary>Ends the turn after a held roll that has no legal move.</summary>
+    public Task<ServerError?> PassAsync(Guid userId, string matchId, long expectedVersion) =>
+        HumanCommandAsync(userId, matchId, expectedVersion, (room, slot) => GameEngine.Pass(room.State, slot.Seat));
+
+    /// <summary>
+    /// Gem reroll: replaces the player's pending (unused) roll with a new server-rolled value.
+    /// Order of checks: request id → match → seat → idempotency cache → version → rules (turn, phase, limit) → gem spend.
+    /// The gem is spent through <see cref="IWalletStore.SpendGemsAsync"/> keyed by match + request id, so a retried or
+    /// replayed request (e.g. after reconnecting) never charges twice. Nothing is charged when any check fails.
+    /// </summary>
+    public async Task<RerollResult> RerollAsync(Guid userId, string matchId, long expectedVersion, string requestId)
+    {
+        if (CommandValidator.ValidateRequestId(requestId) != ErrorCode.None) return RerollFail(ErrorCode.InvalidRequest, null, null, "Invalid request id.");
+        var room = Find(matchId);
+        if (room is null) return RerollFail(ErrorCode.UnknownMatch, null);
+        await room.Gate.WaitAsync();
+        try
+        {
+            var slot = room.SeatOf(userId);
+            if (slot is null || slot.Abandoned) return RerollFail(ErrorCode.NotInMatch, null);
+            var key = $"{userId:N}:{requestId}";
+            if (room.ProcessedRerolls.TryGetValue(key, out var previous)) return previous; // retried request: same answer, no new charge
+            var player = room.State.Players[slot.Seat];
+
+            if (room.Ended) return RerollFail(ErrorCode.GameOver, slot, room);
+            var versionError = CommandValidator.ValidateVersion(room.State, expectedVersion);
+            if (versionError != ErrorCode.None)
+            {
+                await notifier.SendSnapshotAsync(userId, room.SnapshotFor(userId));
+                return RerollFail(versionError, slot, room);
+            }
+            var ruleError = GameEngine.ValidateReroll(room.State, slot.Seat);
+            if (ruleError != ErrorCode.None) return RerollFail(ruleError, slot, room);
+            if (slot.Gems < GameModes.RerollGemCost) return RerollFail(ErrorCode.InsufficientGems, slot, room);
+
+            var spend = await wallet.SpendGemsAsync(userId, room.Id, $"reroll:{room.Id:N}:{requestId}", GameModes.RerollGemCost,
+                Economy.Reasons.Reroll, time.GetUtcNow());
+            slot.Gems = spend.Balance;
+            if (!spend.Charged) return RerollFail(ErrorCode.InsufficientGems, slot, room);
+
+            var result = GameEngine.Reroll(room.State, slot.Seat, dice, CanAffordReroll(room, slot, afterSpending: 0, rerollsAfter: player.RerollsUsed + 1));
+            if (!result.Ok)
+            {
+                // Should be impossible after ValidateReroll; logged loudly because a gem was taken.
+                logger.LogError("Reroll rejected after gem spend in match {MatchId}: {Error}", room.Id, result.Error);
+                return RerollFail(result.Error, slot, room);
+            }
+            slot.MissedTurns = 0;
+            await CommitAsync(room, result);
+            var used = room.State.Players[slot.Seat].RerollsUsed;
+            var ok = new RerollResult(null, (int)slot.Gems, used, Math.Max(0, room.State.Rules.MaxRerolls - used), result.State.LastRoll);
+            room.ProcessedRerolls[key] = ok;
+            return ok;
+        }
+        finally { room.Gate.Release(); }
+    }
+
+    /// <summary>Whether a reroll could be paid for right now (used to decide if a no-move roll is held).</summary>
+    private static bool CanAffordReroll(MatchRoom room, SeatSlot slot, long afterSpending, int? rerollsAfter = null)
+    {
+        if (!slot.IsHuman || slot.ServerControlled || !slot.Connected) return false;
+        var used = rerollsAfter ?? room.State.Players[slot.Seat].RerollsUsed;
+        return used < room.State.Rules.MaxRerolls && slot.Gems - afterSpending >= GameModes.RerollGemCost;
+    }
+
+    private static RerollResult RerollFail(ErrorCode code, SeatSlot? slot, MatchRoom? room = null, string? message = null)
+    {
+        var used = slot is not null && room is not null ? room.State.Players[slot.Seat].RerollsUsed : 0;
+        var remaining = room is not null ? Math.Max(0, room.State.Rules.MaxRerolls - used) : 0;
+        return new RerollResult(Error(code, message), slot is null ? null : (int)slot.Gems, used, remaining, null);
+    }
+
+    private async Task<ServerError?> HumanCommandAsync(Guid userId, string matchId, long expectedVersion, Func<MatchRoom, SeatSlot, EngineResult> action)
     {
         var room = Find(matchId);
         if (room is null) return Error(ErrorCode.UnknownMatch);
@@ -115,7 +194,7 @@ public sealed class MatchService(
                 return Error(versionError);
             }
 
-            var result = action(room, slot.Seat);
+            var result = action(room, slot);
             if (!result.Ok) return Error(result.Error);
             slot.MissedTurns = 0;
             await CommitAsync(room, result);
@@ -295,6 +374,7 @@ public sealed class MatchService(
                     StartedAt = active.Match.StartedAt,
                     Bot = BotFactory.Create(BotDifficulty.Normal, new Random()),
                 };
+                foreach (var s in slots.Where(s => s.IsHuman)) s.Gems = await wallet.GetGemsAsync(s.UserId!.Value, ct);
                 var profileMap = await profiles.GetProfilesAsync(slots.Where(s => s.UserId is not null).Select(s => s.UserId!.Value), ct);
                 foreach (var s in slots.Where(s => s.UserId is not null))
                     if (profileMap.TryGetValue(s.UserId!.Value, out var p)) s.AvatarId = p.AvatarId;
@@ -317,6 +397,13 @@ public sealed class MatchService(
         var slot = room.CurrentSlot;
         var seat = slot.Seat;
 
+        if (!slot.ServerControlled && GameEngine.IsHeldWithoutMoves(room.State))
+        {
+            // The reroll decision window ended without a choice: pass. Not a missed turn — the player had nothing to move.
+            await CommitAsync(room, GameEngine.Pass(room.State, seat));
+            return;
+        }
+
         if (!slot.ServerControlled)
         {
             // A human ran out of time: count the miss once per turn, and play the whole turn for them.
@@ -336,7 +423,7 @@ public sealed class MatchService(
                 if (room.Ended || room.State.CurrentPlayer.Seat != seat || room.State.Phase != GamePhase.AwaitingMove) return;
             }
             var choice = room.Bot.ChooseMove(room.State);
-            await CommitAsync(room, choice is int p ? GameEngine.Move(room.State, seat, p) : GameEngine.ForfeitTurn(room.State, seat));
+            await CommitAsync(room, choice is int p ? GameEngine.Move(room.State, seat, p) : NoMove(room.State, seat));
             return;
         }
 
@@ -348,9 +435,12 @@ public sealed class MatchService(
         else
         {
             var choice = room.Bot.ChooseMove(room.State);
-            await CommitAsync(room, choice is int p ? GameEngine.Move(room.State, seat, p) : GameEngine.ForfeitTurn(room.State, seat));
+            await CommitAsync(room, choice is int p ? GameEngine.Move(room.State, seat, p) : NoMove(room.State, seat));
         }
     }
+
+    private static EngineResult NoMove(GameState state, int seat) =>
+        GameEngine.IsHeldWithoutMoves(state) ? GameEngine.Pass(state, seat) : GameEngine.ForfeitTurn(state, seat);
 
     private async Task CommitAsync(MatchRoom room, EngineResult result)
     {
@@ -406,7 +496,8 @@ public sealed class MatchService(
                 : room.State.WinnerSeat == slot.Seat ? ParticipantResult.Win
                 : ParticipantResult.Loss;
             var (coins, xp) = slot.IsHuman ? RewardPolicy.For(room.Mode, room.Seats.Length, placement, result, humanCount) : (0, 0);
-            return new ParticipantOutcome(slot.Seat, slot.UserId, placement, result, coins, xp, slot.Captures);
+            var gems = slot.IsHuman ? RewardPolicy.GemsFor(room.Mode, placement, result) : 0;
+            return new ParticipantOutcome(slot.Seat, slot.UserId, placement, result, coins, xp, slot.Captures, gems, room.State.Players[slot.Seat].RerollsUsed);
         }).ToList();
 
         var winnerSlot = room.State.WinnerSeat is int w ? room.Seats[w] : null;
@@ -421,7 +512,7 @@ public sealed class MatchService(
 
         await BroadcastAsync(room);
         foreach (var o in outcomes.Where(o => o.UserId is not null && !room.Seats[o.Seat].Abandoned))
-            await notifier.SendMatchEndedAsync(o.UserId!.Value, new MatchEndedInfo(room.MatchIdString, standings, o.Placement, o.CoinsAwarded, o.XpAwarded, reason));
+            await notifier.SendMatchEndedAsync(o.UserId!.Value, new MatchEndedInfo(room.MatchIdString, standings, o.Placement, o.CoinsAwarded, o.XpAwarded, reason, o.GemsAwarded, room.State.Mode));
         logger.LogInformation("Match {MatchId} ended ({Reason}), winner seat {Winner}", room.Id, reason, room.State.WinnerSeat);
     }
 
@@ -430,6 +521,7 @@ public sealed class MatchService(
         var slot = room.CurrentSlot;
         if (slot.ServerControlled) return now.AddSeconds(O.BotDelaySeconds);
         if (!slot.Connected) return now.AddSeconds(O.DisconnectedTurnSeconds);
+        if (GameEngine.IsHeldWithoutMoves(room.State)) return now.AddSeconds(O.HeldRollSeconds);
         return now.AddSeconds(O.TurnSeconds);
     }
 
@@ -459,6 +551,10 @@ public sealed class MatchService(
         ErrorCode.UnknownMatch => "Match not found.",
         ErrorCode.NotInMatch => "You're not playing in this match.",
         ErrorCode.RateLimited => "Slow down a little.",
+        ErrorCode.NoRerollsLeft => "You've used all rerolls allowed in this mode.",
+        ErrorCode.InsufficientGems => "Not enough gems for a reroll.",
+        ErrorCode.RerollNotAllowed => "You can only reroll a roll you haven't used yet.",
+        ErrorCode.InvalidMode => "That game mode isn't available.",
         _ => "Request rejected.",
     });
 }
