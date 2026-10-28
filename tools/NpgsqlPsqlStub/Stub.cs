@@ -108,6 +108,7 @@ public sealed partial class NpgsqlCommand(string sql, NpgsqlConnection connectio
     {
         var desc = await Psql(text + "\n\\gdesc\n", ct);
         var columns = desc.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(l => l.Split('\x1f')).Select(p => (Name: p[0], Type: p[1])).ToList();
+        if (DataModifyingWith().IsMatch(text)) return await RunTopLevelWithAsync(text, columns, ct);
         var json = (await Psql($"WITH __q AS ({text}) SELECT coalesce(json_agg(__q), '[]'::json) FROM __q;\n", ct)).Trim();
         var rows = new List<object?[]>();
         using var doc = JsonDocument.Parse(json);
@@ -118,6 +119,36 @@ public sealed partial class NpgsqlCommand(string sql, NpgsqlConnection connectio
         }
         return new QueryResult(columns, rows);
     }
+
+    // A WITH containing INSERT/UPDATE/DELETE must stay at the top level, so it cannot be wrapped in json_agg.
+    [GeneratedRegex(@"^\s*WITH\b[\s\S]*\b(INSERT|UPDATE|DELETE)\b", RegexOptions.IgnoreCase)]
+    private static partial Regex DataModifyingWith();
+
+    private async Task<QueryResult> RunTopLevelWithAsync(string text, List<(string Name, string Type)> columns, CancellationToken ct)
+    {
+        const char Field = '\x1f', Record = '\x1e', Null = '\x15';
+        var output = await Psql($"\\pset null '{Null}'\n\\pset recordsep '{Record}'\n{text};\n", ct);
+        var rows = new List<object?[]>();
+        foreach (var line in output.Split(Record, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var trimmed = line.Trim('\n', '\r');
+            if (trimmed.Length == 0) continue;
+            var parts = trimmed.Split(Field);
+            rows.Add(columns.Select((c, i) => parts[i] == Null.ToString() ? DBNull.Value : FromText(parts[i], c.Type)).ToArray());
+        }
+        return new QueryResult(columns, rows);
+    }
+
+    private static object? FromText(string v, string type) => type switch
+    {
+        "uuid" => Guid.Parse(v),
+        "boolean" => v == "t",
+        "smallint" => short.Parse(v, CultureInfo.InvariantCulture),
+        "integer" => int.Parse(v, CultureInfo.InvariantCulture),
+        "bigint" => long.Parse(v, CultureInfo.InvariantCulture),
+        _ when type.StartsWith("character") || type == "text" => v,
+        _ => throw new NotSupportedException($"Stub cannot read type {type} from a data-modifying WITH"),
+    };
 
     private static object? FromJson(JsonElement v, string type)
     {

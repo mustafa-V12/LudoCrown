@@ -10,7 +10,7 @@ public static class Sql
     public const string InsertUser = "INSERT INTO users (id, is_guest, created_at) VALUES ($1::uuid, $2::boolean, $3::timestamptz)";
     public const string InsertProfile = "INSERT INTO profiles (user_id, display_name, avatar_id, friend_code, xp, updated_at) VALUES ($1::uuid, $2::text, $3::text, $4::text, 0, $5::timestamptz) ON CONFLICT (friend_code) DO NOTHING";
     public const string InsertStats = "INSERT INTO player_stats (user_id) VALUES ($1::uuid)";
-    public const string InsertWallet = "INSERT INTO wallets (user_id, coins) VALUES ($1::uuid, 0)";
+    public const string InsertWallet = "INSERT INTO wallets (user_id, coins, gems) VALUES ($1::uuid, 0, $2::bigint)";
     public const string GetUser = "SELECT id, is_guest, created_at FROM users WHERE id = $1::uuid";
     public const string FindUserByIdentity = "SELECT user_id FROM auth_identities WHERE provider = $1::text AND subject = $2::text";
     public const string InsertIdentity = "INSERT INTO auth_identities (user_id, provider, subject, email, created_at) VALUES ($1::uuid, $2::text, $3::text, $4::text, $5::timestamptz) ON CONFLICT (provider, subject) DO NOTHING";
@@ -53,14 +53,57 @@ public static class Sql
     public const string GetStats = "SELECT user_id, games_played, games_won, two_player_wins, four_player_wins, pieces_captured, abandons, current_win_streak, best_win_streak FROM player_stats WHERE user_id = $1::uuid";
     public const string GetCoins = "SELECT coins FROM wallets WHERE user_id = $1::uuid";
 
+    // ---------- gems ----------
+    public const string GetGems = "SELECT gems FROM wallets WHERE user_id = $1::uuid";
+    public const string InsertGemLedger = "INSERT INTO wallet_ledger (user_id, delta, reason, match_id, currency, idempotency_key) VALUES ($1::uuid, $2::bigint, $3::text, $4::uuid, 'gems', $5::text) ON CONFLICT DO NOTHING";
+
+    /// <summary>
+    /// One atomic statement: debit only if the balance covers the cost and the key is unused, and write the ledger row.
+    /// A concurrent request with the same key makes the ledger insert hit ux_ledger_idempotency, which aborts the
+    /// whole statement (debit included). Returns the new balance, or no row when nothing was charged.
+    /// </summary>
+    public const string SpendGemsOnce = """
+        WITH debit AS (
+            UPDATE wallets SET gems = gems - $2::bigint
+            WHERE user_id = $1::uuid AND gems >= $2::bigint
+              AND NOT EXISTS (SELECT 1 FROM wallet_ledger WHERE user_id = $1::uuid AND idempotency_key = $5::text)
+            RETURNING gems
+        ), ledger AS (
+            INSERT INTO wallet_ledger (user_id, delta, reason, match_id, currency, idempotency_key)
+            SELECT $1::uuid, -$2::bigint, $3::text, $4::uuid, 'gems', $5::text FROM debit
+            RETURNING 1
+        )
+        SELECT gems FROM debit
+        """;
+
+    /// <summary>Why a spend charged nothing: key already used, current balance (NULL = no such wallet).</summary>
+    public const string GemSpendState = "SELECT EXISTS (SELECT 1 FROM wallet_ledger WHERE user_id = $1::uuid AND idempotency_key = $2::text), (SELECT gems FROM wallets WHERE user_id = $1::uuid)";
+
+    /// <summary>
+    /// One atomic statement: write the ledger row (skipped if its idempotency key or match reward already exists)
+    /// and credit the wallet only when the row was written. Returns the new balance, or no row when skipped.
+    /// </summary>
+    public const string CreditGemsOnce = """
+        WITH ledger AS (
+            INSERT INTO wallet_ledger (user_id, delta, reason, match_id, currency, idempotency_key)
+            VALUES ($1::uuid, $2::bigint, $3::text, $4::uuid, 'gems', $5::text)
+            ON CONFLICT DO NOTHING
+            RETURNING delta
+        )
+        UPDATE wallets SET gems = gems + (SELECT delta FROM ledger)
+        WHERE user_id = $1::uuid AND EXISTS (SELECT 1 FROM ledger)
+        RETURNING gems
+        """;
+
     // ---------- matches ----------
-    public const string InsertMatch = "INSERT INTO matches (id, mode, player_count, room_code, started_at, state_json, state_version) VALUES ($1::uuid, $2::text, $3::smallint, $4::text, $5::timestamptz, $6::jsonb, 0)";
+    public const string InsertMatch = "INSERT INTO matches (id, mode, player_count, room_code, started_at, state_json, state_version, game_mode) VALUES ($1::uuid, $2::text, $3::smallint, $4::text, $5::timestamptz, $6::jsonb, 0, $7::text)";
     public const string InsertParticipant = "INSERT INTO match_participants (match_id, seat, user_id, is_bot, display_name, color) VALUES ($1::uuid, $2::smallint, $3::uuid, $4::boolean, $5::text, $6::text)";
     public const string SaveLiveState = "UPDATE matches SET state_json = $2::jsonb, state_version = $3::bigint WHERE id = $1::uuid AND status = 'active' AND state_version <= $3::bigint";
     public const string LockActiveMatch = "SELECT id FROM matches WHERE id = $1::uuid AND status = 'active' FOR UPDATE";
     public const string FinishMatch = "UPDATE matches SET status = $2::text, ended_at = $3::timestamptz, winner_user_id = $4::uuid, state_json = $5::jsonb WHERE id = $1::uuid";
     public const string RecordParticipantResult = """
-        UPDATE match_participants SET placement = $3::smallint, result = $4::text, coins_awarded = $5::integer, xp_awarded = $6::integer, pieces_captured = $7::integer
+        UPDATE match_participants SET placement = $3::smallint, result = $4::text, coins_awarded = $5::integer, xp_awarded = $6::integer, pieces_captured = $7::integer,
+            rerolls_used = $8::smallint, gems_awarded = $9::integer
         WHERE match_id = $1::uuid AND seat = $2::smallint
         """;
     public const string ApplyStats = """
@@ -78,11 +121,12 @@ public static class Sql
     public const string AddXp = "UPDATE profiles SET xp = xp + $2::integer WHERE user_id = $1::uuid";
     public const string AddCoins = "UPDATE wallets SET coins = coins + $2::bigint WHERE user_id = $1::uuid";
     public const string InsertLedger = "INSERT INTO wallet_ledger (user_id, delta, reason, match_id) VALUES ($1::uuid, $2::bigint, 'match_reward', $3::uuid) ON CONFLICT DO NOTHING";
-    public const string GetActiveMatches = "SELECT id, mode, player_count, room_code, started_at, state_json::text FROM matches WHERE status = 'active'";
+    public const string GetActiveMatches = "SELECT id, mode, player_count, room_code, started_at, state_json::text, game_mode FROM matches WHERE status = 'active'";
     public const string GetParticipants = "SELECT match_id, seat, user_id, is_bot, display_name, color FROM match_participants WHERE match_id = ANY($1::uuid[]) ORDER BY match_id, seat";
     public const string GetHistory = """
         SELECT m.id, m.mode, m.player_count, m.started_at, m.ended_at, me.placement, me.result, me.coins_awarded, me.xp_awarded,
-               COALESCE((SELECT array_agg(o.display_name ORDER BY o.seat) FROM match_participants o WHERE o.match_id = m.id AND o.seat <> me.seat), '{}') AS opponents
+               COALESCE((SELECT array_agg(o.display_name ORDER BY o.seat) FROM match_participants o WHERE o.match_id = m.id AND o.seat <> me.seat), '{}') AS opponents,
+               m.game_mode, me.rerolls_used, me.gems_awarded
         FROM match_participants me
         JOIN matches m ON m.id = me.match_id
         WHERE me.user_id = $1::uuid AND m.status <> 'active' AND me.result IS NOT NULL
