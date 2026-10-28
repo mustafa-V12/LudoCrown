@@ -42,7 +42,9 @@ jobs:
           PGPASSWORD: ci
         run: |
           createdb -h localhost -U ci ludocrown_verify
-          psql -h localhost -U ci -d ludocrown_verify -v ON_ERROR_STOP=1 -f db/migrations/0001_initial_schema.sql
+          for f in db/migrations/*.sql; do
+            psql -h localhost -U ci -d ludocrown_verify -v ON_ERROR_STOP=1 -f "$f"
+          done
           python3 tools/verify-sql.py "postgresql://ci:ci@localhost/ludocrown_verify"
 
   # ios:
