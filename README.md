@@ -18,7 +18,29 @@ A polished, social Ludo game for iPhone, built with **.NET MAUI (C#)**, an **aut
 
 > **Status at a glance:** see [HANDOFF.md](HANDOFF.md) for exactly what is implemented, what was verified (and how), and what still needs your accounts, credentials or a Mac.
 
+## Screenshots
+
+Taken from the Windows build running against the local development server. The iPhone build uses the same screens.
+
+| | |
+|---|---|
+| ![Home screen with Classic/Quick mode picker and ranked/casual queues](docs/screenshots/01-home-modes.jpg) | ![A held roll with the gem reroll and pass buttons](docs/screenshots/02-reroll.jpg) |
+| **Home:** choose Classic or Quick, ranked or casual | **Gem reroll:** reroll or pass, with the remaining rerolls shown |
+| ![Shield bottle active on the board](docs/screenshots/03-shield.jpg) | ![Quick chat panel with preset phrases and emoji](docs/screenshots/04-quick-chat.jpg) |
+| **Shield bottle** (casual only), visible to every player | **Quick chat:** preset phrases and emoji |
+| ![Results screen](docs/screenshots/05-results.jpg) | ![Store in development sandbox mode](docs/screenshots/06-store-sandbox.jpg) |
+| **Results** | **Store** (development sandbox, no real purchases) |
+| ![League screen with season rewards](docs/screenshots/07-league.jpg) | ![Offline Classic game against bots](docs/screenshots/08-offline-classic.jpg) |
+| **League:** season, group and reward table (development data) | **Offline** Classic game against computer opponents |
+
 ![Board preview rendered from the app's drawing code](docs/board-preview.png)
+
+## Working together
+
+- `main` should always build and pass the tests. Do new work on a branch (`git switch -c feature/my-change`), push it, and open a pull request on GitHub so the other person can review it.
+- Before you push, run the tests: `dotnet test` (or `tools\windows\build-and-test.cmd` on Windows).
+- Never commit secrets: real keys, passwords, `.p8`/`.p12` files, or `appsettings.*.local.json`. They are already listed in `.gitignore`. Use environment variables or user secrets as described below.
+- Rules for gameplay, the store and the league live in `docs/`. Update them in the same pull request when you change behaviour.
 
 ---
 
