@@ -178,7 +178,7 @@ public sealed class BoardView : GraphicsView
     }
 }
 
-/// <summary>Draws a die face (1–6) with ivory body and jewel pips.</summary>
+/// <summary>Draws a die face (1–6): glossy ivory body, dark pips, a ruby pip for the 1.</summary>
 public sealed class DiceDrawable : IDrawable
 {
     public int Value { get; set; } = 1;
@@ -188,27 +188,25 @@ public sealed class DiceDrawable : IDrawable
 
     public void Draw(ICanvas canvas, RectF rect)
     {
-        var size = Math.Min(rect.Width, rect.Height) * 0.86f;
+        var size = Math.Min(rect.Width, rect.Height) * 0.9f;
         var r = new RectF(rect.Center.X - size / 2, rect.Center.Y - size / 2, size, size);
-        if (Enabled)
-        {
-            canvas.FillColor = Palette.Gold.WithAlpha(0.25f + 0.35f * Glow);
-            canvas.FillRoundedRectangle(r.Inflate(size * 0.08f, size * 0.08f), size * 0.28f);
-        }
-        canvas.SetShadow(new SizeF(0, size * 0.05f), size * 0.12f, Microsoft.Maui.Graphics.Color.FromRgba(0, 0, 0, 120));
-        canvas.FillColor = Enabled ? Palette.Ivory : Palette.Parchment.WithAlpha(0.75f);
-        canvas.FillRoundedRectangle(r, size * 0.22f);
+        canvas.SetShadow(new SizeF(0, size * 0.06f), size * 0.1f, Microsoft.Maui.Graphics.Color.FromRgba(0, 0, 0, 110));
+        canvas.FillColor = Microsoft.Maui.Graphics.Color.FromArgb("#D9CBA8");
+        canvas.FillRoundedRectangle(new RectF(r.X, r.Y + size * 0.05f, r.Width, r.Height), size * 0.24f);
         canvas.SetShadow(new SizeF(0, 0), 0, null);
-        canvas.StrokeColor = Enabled ? Palette.Gold : Palette.Line;
-        canvas.StrokeSize = size * 0.05f;
-        canvas.DrawRoundedRectangle(r, size * 0.22f);
+        var body = new LinearGradientPaint
+        {
+            StartPoint = new Point(0, 0), EndPoint = new Point(1, 1),
+            GradientStops = new[] { new PaintGradientStop(0, Colors.White), new PaintGradientStop(1, Microsoft.Maui.Graphics.Color.FromArgb("#F1E6D0")) },
+        };
+        canvas.SetFillPaint(body, r);
+        canvas.FillRoundedRectangle(r, size * 0.24f);
 
-        var pip = Enabled ? Palette.Of(Color) : Palette.Ink.WithAlpha(0.5f);
-        canvas.FillColor = pip;
-        float q = size / 4;
+        canvas.FillColor = Value == 1 ? Microsoft.Maui.Graphics.Color.FromArgb("#D7263D") : Palette.Ink;
+        float q = size / 4.1f;
         var cx = r.Center.X;
         var cy = r.Center.Y;
-        var pr = size * 0.09f;
+        var pr = size * (Value == 1 ? 0.12f : 0.085f);
         void P(float dx, float dy) => canvas.FillCircle(cx + dx * q, cy + dy * q, pr);
         switch (Value)
         {
@@ -232,8 +230,8 @@ public sealed class DiceView : GraphicsView
     public DiceView()
     {
         Drawable = _drawable;
-        WidthRequest = 84;
-        HeightRequest = 84;
+        WidthRequest = 46;
+        HeightRequest = 46;
         StartInteraction += (_, _) => { if (_drawable.Enabled) Tapped?.Invoke(); };
         SemanticProperties.SetDescription(this, "Die");
         SemanticProperties.SetHint(this, "Double tap to roll when it's your turn");

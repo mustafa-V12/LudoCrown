@@ -1,5 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
-  <circle cx="64" cy="64" r="62" fill="#E9B949"/>
-  <circle cx="64" cy="64" r="56" fill="#2F6FE0"/>
-  <path d="M44 98 L44 88 C44 76 54 70 58 62 L48 64 L40 58 C46 44 56 32 72 30 L76 24 L80 32 C92 38 96 54 92 70 C90 80 86 86 86 98 Z" fill="#FBF3E4"/><circle cx="70" cy="44" r="3.5" fill="#2F6FE0"/>
-</svg>
+<svg width="128" height="128" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><radialGradient id="bg-knight" cx="50%" cy="35%" r="75%"><stop offset="0" stop-color="#5A92F2"/><stop offset="1" stop-color="#173E8C"/></radialGradient><clipPath id="clip-knight"><circle cx="50" cy="50" r="50"/></clipPath></defs><circle cx="50" cy="50" r="50" fill="url(#bg-knight)"/><g clip-path="url(#clip-knight)"><ellipse cx="50" cy="104" rx="36" ry="24" fill="#8E9AAF"/><path d="M38 82 L50 92 L62 82" stroke="#D7263D" stroke-width="3" fill="none"/><path d="M24 64 Q22 30 50 26 Q78 30 76 64 L76 80 L24 80 Z" fill="#C9D1DE" stroke="#7D8899" stroke-width="2"/><rect x="31" y="50" width="38" height="9" rx="4" fill="#2B1B3D"/><path d="M50 30 L50 80" stroke="#7D8899" stroke-width="2"/><circle cx="34" cy="70" r="1.8" fill="#7D8899"/><circle cx="66" cy="70" r="1.8" fill="#7D8899"/><path d="M50 26 Q62 6 78 10 Q66 14 60 26 Z" fill="#D7263D"/></g></svg>

@@ -47,8 +47,12 @@ public sealed class PageHeader : ContentView
     public static readonly BindableProperty TitleProperty = BindableProperty.Create(nameof(Title), typeof(string), typeof(PageHeader), "", propertyChanged: (b, _, n) => ((PageHeader)b)._title.Text = (string)n);
     public static readonly BindableProperty ShowBackProperty = BindableProperty.Create(nameof(ShowBack), typeof(bool), typeof(PageHeader), true, propertyChanged: (b, _, n) => ((PageHeader)b)._back.IsVisible = (bool)n);
 
-    private readonly Label _title = new() { FontSize = 20, FontAttributes = FontAttributes.Bold, VerticalOptions = LayoutOptions.Center, HorizontalOptions = LayoutOptions.Center };
-    private readonly Button _back = new() { Text = "‹ Back", Style = (Style)Microsoft.Maui.Controls.Application.Current!.Resources["LinkButton"], HorizontalOptions = LayoutOptions.Start };
+    private readonly Label _title = new() { FontSize = 24, FontFamily = "BalooHeavy", TextColor = Color.FromArgb("#FFE08A"), VerticalOptions = LayoutOptions.Center, HorizontalOptions = LayoutOptions.Center };
+    private readonly Button _back = new()
+    {
+        Text = "‹", FontSize = 28, Padding = new Thickness(0, -4, 0, 0), WidthRequest = 46, HeightRequest = 46, MinimumHeightRequest = 46, CornerRadius = 14,
+        Style = (Style)Microsoft.Maui.Controls.Application.Current!.Resources["SecondaryButton"], HorizontalOptions = LayoutOptions.Start, VerticalOptions = LayoutOptions.Center,
+    };
 
     public PageHeader()
     {
@@ -57,7 +61,7 @@ public sealed class PageHeader : ContentView
         _back.Clicked += async (_, _) => { if (BackCommand is null) await Shell.Current.GoToAsync(".."); else BackCommand.Execute(null); };
         Content = new Grid
         {
-            Padding = new Thickness(8, 4),
+            Padding = new Thickness(12, 6),
             MinimumHeightRequest = 52,
             Children = { _title, _back },
         };

@@ -10,6 +10,7 @@
         <views:PageHeader Title="Play offline" />
         <ScrollView Grid.Row="1">
             <VerticalStackLayout Padding="20,8" Spacing="14" MaximumWidthRequest="520">
+                <Image Source="tile_offline.png" HeightRequest="96" SemanticProperties.Description="Play against the computer" />
                 <Border Style="{StaticResource Card}" IsVisible="{Binding HasSave}">
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
                         <Label Text="You have an unfinished game." VerticalOptions="Center" />
@@ -55,6 +56,6 @@
                 <Label Text="{Binding Error}" IsVisible="{Binding HasError}" Style="{StaticResource ErrorText}" />
             </VerticalStackLayout>
         </ScrollView>
-        <Button Grid.Row="2" Text="Start game" Command="{Binding StartCommand}" Margin="20,8,20,20" />
+        <Button Grid.Row="2" Text="PLAY" FontSize="22" MinimumHeightRequest="58" Command="{Binding StartCommand}" Margin="20,8,20,20" />
     </Grid>
 </views:BasePage>

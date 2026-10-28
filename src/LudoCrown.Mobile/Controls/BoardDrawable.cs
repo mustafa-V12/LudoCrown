@@ -74,20 +74,21 @@ public sealed class BoardDrawable : IDrawable
         canvas.FillColor = baseColor;
         canvas.FillRoundedRectangle(rect.Inflate(-c * 0.08f, -c * 0.08f), c * 0.5f);
 
-        // Inner parchment court with four gem sockets.
-        var inner = rect.Inflate(-c * 0.85f, -c * 0.85f);
-        canvas.FillColor = Palette.Ivory;
-        canvas.FillRoundedRectangle(inner, c * 0.45f);
-        canvas.StrokeColor = Palette.Dark(color).WithAlpha(0.35f);
-        canvas.StrokeSize = Math.Max(1, c * 0.05f);
-        canvas.DrawRoundedRectangle(inner, c * 0.45f);
+        // Darker recessed tray with four sockets, as in classic Ludo boards.
+        var inner = rect.Inflate(-c * 0.8f, -c * 0.8f);
+        canvas.FillColor = active ? Palette.Dark(color) : Palette.Of(color).WithSaturation(0.15f).WithLuminosity(0.42f);
+        canvas.FillRoundedRectangle(inner, c * 0.4f);
+        canvas.StrokeColor = Color.FromRgba(0, 0, 0, 70);
+        canvas.StrokeSize = Math.Max(1, c * 0.12f);
+        canvas.DrawRoundedRectangle(inner.Inflate(-c * 0.06f, -c * 0.06f), c * 0.36f);
         for (var i = 0; i < 4; i++)
         {
             var p = ToScreen(BoardGeometry.YardSlot(color, i));
-            canvas.FillColor = Palette.Light(color).WithAlpha(active ? 0.55f : 0.3f);
-            canvas.FillCircle(p, c * 0.52f);
-            canvas.StrokeColor = Palette.Of(color).WithAlpha(active ? 0.8f : 0.3f);
-            canvas.DrawCircle(p, c * 0.52f);
+            canvas.FillColor = Color.FromRgba(0, 0, 0, 56);
+            canvas.FillCircle(p, c * 0.5f);
+            canvas.StrokeColor = Palette.Light(color).WithAlpha(active ? 0.45f : 0.2f);
+            canvas.StrokeSize = Math.Max(1, c * 0.05f);
+            canvas.DrawCircle(p, c * 0.5f);
         }
 
         if (isCurrent)
@@ -100,14 +101,15 @@ public sealed class BoardDrawable : IDrawable
 
     private void DrawTrack(ICanvas canvas, float c)
     {
-        canvas.StrokeColor = Palette.Line;
-        canvas.StrokeSize = Math.Max(1, c * 0.04f);
+        canvas.StrokeColor = Color.FromRgba(38, 22, 74, 140);
+        canvas.StrokeSize = Math.Max(1, c * 0.035f);
 
         for (var i = 0; i < BoardGeometry.TrackLength; i++)
         {
             var cell = CellRect(BoardGeometry.TrackCell(i), c);
             var startOf = BoardGeometry.StartSquares.Contains(i) ? (PlayerColor?)(PlayerColor)(i / BoardGeometry.QuarterLength) : null;
-            canvas.FillColor = startOf is PlayerColor sc ? Palette.Of(sc) : Palette.Ivory;
+            canvas.FillColor = startOf is PlayerColor sc ? Palette.Of(sc)
+                : BoardGeometry.StarSquares.Contains(i) ? Color.FromArgb("#E4DDF0") : Color.FromArgb("#FFFDF8");
             canvas.FillRectangle(cell);
             canvas.DrawRectangle(cell);
             if (startOf is PlayerColor s2) DrawArrow(canvas, cell, s2);
@@ -119,7 +121,7 @@ public sealed class BoardDrawable : IDrawable
             for (var step = 0; step < 5; step++)
             {
                 var cell = CellRect(BoardGeometry.HomeColumnCell(color, step), c);
-                canvas.FillColor = Palette.Of(color).WithLuminosity(Math.Min(0.75f, Palette.Of(color).GetLuminosity() + 0.08f * step));
+                canvas.FillColor = step == 4 ? Palette.Of(color).WithLuminosity(Math.Min(0.75f, Palette.Of(color).GetLuminosity() + 0.08f)) : Palette.Of(color);
                 canvas.FillRectangle(cell);
                 canvas.DrawRectangle(cell);
             }
@@ -233,7 +235,7 @@ public sealed class BoardDrawable : IDrawable
                 var offset = list.Count == 1 ? new PointF(0, 0) : StackOffset(k, list.Count, c);
                 var p = ToScreen(s.Position);
                 p = new PointF(p.X + offset.X, p.Y + offset.Y);
-                var radius = c * (list.Count == 1 ? 0.38f : 0.3f) * s.Scale;
+                var radius = c * (list.Count == 1 ? 0.4f : 0.31f) * s.Scale;
                 var movable = s.Seat == currentSeat && legal.Contains(s.Index);
                 DrawPiece(canvas, p, radius, s.Color, movable);
             }
@@ -251,32 +253,31 @@ public sealed class BoardDrawable : IDrawable
     {
         if (movable)
         {
-            canvas.FillColor = Palette.Gold.WithAlpha(0.25f + 0.35f * Pulse);
-            canvas.FillCircle(p, r * (1.45f + 0.15f * Pulse));
+            canvas.FillColor = Palette.GoldLight.WithAlpha(0.28f + 0.4f * Pulse);
+            canvas.FillCircle(p, r * (1.5f + 0.18f * Pulse));
         }
-
-        canvas.SetShadow(new SizeF(0, r * 0.18f), r * 0.35f, Color.FromRgba(0, 0, 0, 110));
-        canvas.FillColor = Palette.Dark(color);
-        canvas.FillCircle(p, r);
-        canvas.SetShadow(new SizeF(0, 0), 0, null);
-
-        // Gem body with a radial highlight.
-        var body = new RadialGradientPaint
+        // Coin: drop shadow, thick gold rim, coloured face with a shine, white crown emblem.
+        canvas.FillColor = Color.FromRgba(0, 0, 0, 80);
+        canvas.FillEllipse(p.X - r * 0.95f, p.Y + r * 0.42f - r * 0.5f, r * 1.9f, r);
+        canvas.FillColor = Palette.GoldDeep;
+        canvas.FillCircle(p.X, p.Y + r * 0.12f, r);
+        var rim = new LinearGradientPaint
         {
-            Center = new Point(0.35, 0.3),
-            Radius = 0.75,
-            StartColor = Palette.Light(color),
-            EndColor = Palette.Of(color),
+            StartPoint = new Point(0.5, 0), EndPoint = new Point(0.5, 1),
+            GradientStops = new[] { new PaintGradientStop(0, Color.FromArgb("#FFE69A")), new PaintGradientStop(0.5f, Palette.Gold), new PaintGradientStop(1, Palette.GoldDeep) },
         };
-        canvas.SetFillPaint(body, new RectF(p.X - r * 0.86f, p.Y - r * 0.86f, r * 1.72f, r * 1.72f));
-        canvas.FillCircle(p, r * 0.86f);
-
-        canvas.StrokeColor = Palette.Ivory;
-        canvas.StrokeSize = Math.Max(1.2f, r * 0.14f);
-        canvas.DrawCircle(p, r * 0.86f);
-
-        // Tiny crown mark makes pieces recognisable without relying on colour alone.
-        DrawCrown(canvas, new PointF(p.X, p.Y + r * 0.04f), r * 0.82f);
+        canvas.SetFillPaint(rim, new RectF(p.X - r, p.Y - r, r * 2, r * 2));
+        canvas.FillCircle(p, r);
+        var face = new RadialGradientPaint
+        {
+            Center = new Point(0.35, 0.3), Radius = 0.75,
+            GradientStops = new[] { new PaintGradientStop(0, Palette.Light(color)), new PaintGradientStop(0.55f, Palette.Of(color)), new PaintGradientStop(1, Palette.Dark(color)) },
+        };
+        canvas.SetFillPaint(face, new RectF(p.X - r * 0.76f, p.Y - r * 0.76f, r * 1.52f, r * 1.52f));
+        canvas.FillCircle(p, r * 0.76f);
+        DrawEmblem(canvas, new PointF(p.X, p.Y + r * 0.05f), r * 0.82f);
+        canvas.FillColor = Color.FromRgba(255, 255, 255, 90);
+        canvas.FillEllipse(p.X - r * 0.55f, p.Y - r * 0.58f, r * 0.75f, r * 0.32f);
 
         if (movable)
         {
@@ -284,6 +285,26 @@ public sealed class BoardDrawable : IDrawable
             canvas.StrokeSize = Math.Max(2, r * 0.16f);
             canvas.DrawCircle(p, r * 1.08f);
         }
+    }
+
+    /// <summary>The white crown stamped on each piece.</summary>
+    private static void DrawEmblem(ICanvas canvas, PointF centre, float size)
+    {
+        var w = size * 0.78f;
+        var h = w * 0.62f;
+        var x = centre.X - w / 2;
+        var y = centre.Y - h / 2;
+        var path = new PathF();
+        path.MoveTo(x + w * 0.1f, y + h);
+        path.LineTo(x, y + h * 0.2f);
+        path.LineTo(x + w * 0.3f, y + h * 0.52f);
+        path.LineTo(x + w * 0.5f, y);
+        path.LineTo(x + w * 0.7f, y + h * 0.52f);
+        path.LineTo(x + w, y + h * 0.2f);
+        path.LineTo(x + w * 0.9f, y + h);
+        path.Close();
+        canvas.FillColor = Color.FromRgba(255, 253, 248, 242);
+        canvas.FillPath(path);
     }
 
     private RectF CellRect(GridPoint g, float c) => new(BoardRect.Left + (float)g.X * c, BoardRect.Top + (float)g.Y * c, c, c);

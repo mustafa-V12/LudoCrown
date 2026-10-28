@@ -9,6 +9,9 @@ public static class Palette
     public static readonly Color Velvet = Color.FromArgb("#21154A");
     public static readonly Color Plum = Color.FromArgb("#2E1B5C");
     public static readonly Color Gold = Color.FromArgb("#E9B949");
+    public static readonly Color GoldLight = Color.FromArgb("#FFE08A");
+    public static readonly Color Muted = Color.FromArgb("#C3B8E0");
+    public static readonly Color Emerald = Color.FromArgb("#17A673");
     public static readonly Color GoldDeep = Color.FromArgb("#B8862B");
     public static readonly Color Ivory = Color.FromArgb("#FBF3E4");
     public static readonly Color Parchment = Color.FromArgb("#F1E4C8");

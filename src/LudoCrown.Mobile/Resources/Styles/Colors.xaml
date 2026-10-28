@@ -7,22 +7,66 @@
     <Color x:Key="Plum">#2E1B5C</Color>
     <Color x:Key="PlumLight">#3D2875</Color>
     <Color x:Key="Gold">#E9B949</Color>
+    <Color x:Key="GoldLight">#FFE08A</Color>
     <Color x:Key="GoldDeep">#B8862B</Color>
     <Color x:Key="Ivory">#FBF3E4</Color>
-    <Color x:Key="Muted">#B9AED6</Color>
+    <Color x:Key="Muted">#C3B8E0</Color>
     <Color x:Key="Ink">#1A1230</Color>
     <Color x:Key="Danger">#FF6B6B</Color>
     <Color x:Key="Ruby">#D7263D</Color>
     <Color x:Key="Emerald">#17A673</Color>
     <Color x:Key="Topaz">#F2A71B</Color>
     <Color x:Key="Sapphire">#2F6FE0</Color>
+    <Color x:Key="PanelEdge">#140C2E</Color>
+
     <LinearGradientBrush x:Key="BackgroundBrush" StartPoint="0,0" EndPoint="0,1">
-        <GradientStop Color="#2A1660" Offset="0" />
-        <GradientStop Color="#140C2E" Offset="0.55" />
-        <GradientStop Color="#0E0822" Offset="1" />
+        <GradientStop Color="#4A1C78" Offset="0" />
+        <GradientStop Color="#2C1458" Offset="0.45" />
+        <GradientStop Color="#140C2E" Offset="1" />
     </LinearGradientBrush>
     <LinearGradientBrush x:Key="GoldBrush" StartPoint="0,0" EndPoint="0,1">
-        <GradientStop Color="#F6D36B" Offset="0" />
-        <GradientStop Color="#D9A23A" Offset="1" />
+        <GradientStop Color="#FFE590" Offset="0" />
+        <GradientStop Color="#F4C24F" Offset="0.45" />
+        <GradientStop Color="#E0A22C" Offset="1" />
     </LinearGradientBrush>
+    <LinearGradientBrush x:Key="VioletBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#9A72FF" Offset="0" />
+        <GradientStop Color="#6A3FD6" Offset="0.55" />
+        <GradientStop Color="#4C26A8" Offset="1" />
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="RedBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#FF8A5C" Offset="0" />
+        <GradientStop Color="#E2432F" Offset="1" />
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="PanelBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#4B2A8C" Offset="0" />
+        <GradientStop Color="#2E1B5C" Offset="0.4" />
+        <GradientStop Color="#21154A" Offset="1" />
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="CardBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#5A3399" Offset="0" />
+        <GradientStop Color="#3A2172" Offset="1" />
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="BottomBarBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#3C1A6E" Offset="0" />
+        <GradientStop Color="#1A0C3C" Offset="1" />
+    </LinearGradientBrush>
+    <RadialGradientBrush x:Key="GoldTileBrush" Center="0.5,0.2" Radius="0.95">
+        <GradientStop Color="#FFE27A" Offset="0" />
+        <GradientStop Color="#F6B733" Offset="0.45" />
+        <GradientStop Color="#D9820F" Offset="1" />
+    </RadialGradientBrush>
+    <RadialGradientBrush x:Key="VioletTileBrush" Center="0.5,0.2" Radius="0.95">
+        <GradientStop Color="#A888FF" Offset="0" />
+        <GradientStop Color="#6C43DC" Offset="0.45" />
+        <GradientStop Color="#3D1D96" Offset="1" />
+    </RadialGradientBrush>
+    <RadialGradientBrush x:Key="SmallTileBrush" Center="0.5,0.15" Radius="1">
+        <GradientStop Color="#8C6CE8" Offset="0" />
+        <GradientStop Color="#5A35B8" Offset="0.5" />
+        <GradientStop Color="#3A1F86" Offset="1" />
+    </RadialGradientBrush>
+    <Shadow x:Key="TileShadow" Brush="#0A0418" Offset="0,6" Radius="0" Opacity="0.85" />
+    <Shadow x:Key="ButtonShadow" Brush="#0A0418" Offset="0,4" Radius="0" Opacity="0.7" />
+    <Shadow x:Key="GlowShadow" Brush="#FFE08A" Offset="0,0" Radius="16" Opacity="0.9" />
 </ResourceDictionary>

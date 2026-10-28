@@ -15,6 +15,13 @@ public static class MauiProgram
     {
         var builder = MauiApp.CreateBuilder();
         builder.UseMauiApp<App>();
+        builder.ConfigureFonts(fonts =>
+        {
+            // Baloo 2 (SIL Open Font License, Resources/Fonts/OFL-Baloo2.txt): the rounded game font used across the app.
+            fonts.AddFont("Baloo2-SemiBold.ttf", "BalooSemi");
+            fonts.AddFont("Baloo2-Bold.ttf", "BalooBold");
+            fonts.AddFont("Baloo2-ExtraBold.ttf", "BalooHeavy");
+        });
 
         builder.ConfigureLifecycleEvents(events =>
         {

@@ -2,39 +2,55 @@
 <views:BasePage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
                 xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
                 xmlns:views="clr-namespace:LudoCrown.Mobile.Views"
+                xmlns:controls="clr-namespace:LudoCrown.Mobile.Controls"
                 xmlns:vm="clr-namespace:LudoCrown.App.ViewModels;assembly=LudoCrown.App.Logic"
                 x:Class="LudoCrown.Mobile.Views.ResultsPage"
                 x:DataType="vm:ResultsViewModel">
-    <Grid RowDefinitions="*,Auto">
+    <Grid>
         <ScrollView>
-            <VerticalStackLayout Padding="24,40,24,12" Spacing="16" MaximumWidthRequest="480">
-                <Image x:Name="Crown" Source="crown_logo.png" WidthRequest="140" HeightRequest="105" SemanticProperties.Description="Crown" />
-                <Label Text="{Binding Title}" Style="{StaticResource Title}" HorizontalTextAlignment="Center" />
-                <Label Text="{Binding Subtitle}" Style="{StaticResource Caption}" HorizontalOptions="Center" />
-                <Border Style="{StaticResource Card}" IsVisible="{Binding HasRewards}" HorizontalOptions="Center" Padding="20,10">
-                    <Label Text="{Binding RewardsText}" FontAttributes="Bold" TextColor="{StaticResource Gold}" FontSize="18" />
+            <Grid Padding="16,40,16,20" MaximumWidthRequest="460" VerticalOptions="Center">
+                <Border Style="{StaticResource Panel}" Margin="0,22,0,0">
+                    <VerticalStackLayout Spacing="10">
+                        <Image x:Name="Crown" Source="crown_logo.png" WidthRequest="120" HeightRequest="90" SemanticProperties.Description="Crown" />
+                        <Label Text="{Binding Title}" Style="{StaticResource Title}" FontSize="32" HorizontalTextAlignment="Center" />
+                        <Label Text="{Binding Subtitle}" Style="{StaticResource Caption}" HorizontalTextAlignment="Center" />
+                        <Border IsVisible="{Binding HasRewards}" HorizontalOptions="Center" Padding="16,4" StrokeShape="RoundRectangle 16"
+                                Background="#B30A051C" Stroke="{StaticResource Gold}" StrokeThickness="2">
+                            <HorizontalStackLayout Spacing="6">
+                                <Image Source="icon_coin.png" WidthRequest="24" HeightRequest="24" VerticalOptions="Center" />
+                                <Label Text="{Binding RewardsText}" FontFamily="BalooHeavy" TextColor="{StaticResource GoldLight}" FontSize="17" VerticalOptions="Center" />
+                            </HorizontalStackLayout>
+                        </Border>
+                        <Label Text="{Binding LeagueText}" IsVisible="{Binding HasLeague}" FontFamily="BalooHeavy" HorizontalOptions="Center" />
+                        <Label Text="{Binding ModeText}" Style="{StaticResource Caption}" FontSize="13" HorizontalOptions="Center" HorizontalTextAlignment="Center" />
+                        <VerticalStackLayout BindableLayout.ItemsSource="{Binding Rows}" Spacing="6" Margin="0,4">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ResultRow">
+                                    <Border Padding="10,6" StrokeShape="RoundRectangle 16" Background="#800A051C" Stroke="#1FFFFFFF" StrokeThickness="2">
+                                        <Grid ColumnDefinitions="46,Auto,*" ColumnSpacing="10">
+                                            <Label Text="{Binding PlacementText}" FontFamily="BalooHeavy" FontSize="19" TextColor="{StaticResource GoldLight}" VerticalOptions="Center" />
+                                            <Grid Grid.Column="1" WidthRequest="24" HeightRequest="24" VerticalOptions="Center">
+                                                <BoxView Color="White" CornerRadius="12" />
+                                                <BoxView Color="{Binding Color, Converter={StaticResource PlayerColor}}" CornerRadius="10" Margin="2" />
+                                            </Grid>
+                                            <Label Grid.Column="2" Text="{Binding Name}" FontFamily="BalooHeavy" FontSize="17" VerticalOptions="Center" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </VerticalStackLayout>
+                        <Label Text="{Binding Error}" IsVisible="{Binding HasError}" Style="{StaticResource ErrorText}" />
+                        <Grid ColumnDefinitions="*,1.3*" ColumnSpacing="10" Margin="0,6,0,0">
+                            <Button Text="LOBBY" Command="{Binding HomeCommand}" Style="{StaticResource SecondaryButton}" />
+                            <Button Grid.Column="1" Text="{Binding PlayAgainText}" Command="{Binding PlayAgainCommand}" />
+                        </Grid>
+                    </VerticalStackLayout>
                 </Border>
-                <Label Text="{Binding LeagueText}" IsVisible="{Binding HasLeague}" FontAttributes="Bold" HorizontalOptions="Center" />
-                <Label Text="{Binding ModeText}" Style="{StaticResource Caption}" HorizontalOptions="Center" HorizontalTextAlignment="Center" />
-                <VerticalStackLayout BindableLayout.ItemsSource="{Binding Rows}" Spacing="10" Margin="0,8">
-                    <BindableLayout.ItemTemplate>
-                        <DataTemplate x:DataType="vm:ResultRow">
-                            <Border Style="{StaticResource Card}" Padding="14,10">
-                                <Grid ColumnDefinitions="56,Auto,*" ColumnSpacing="12">
-                                    <Label Text="{Binding PlacementText}" FontSize="20" FontAttributes="Bold" TextColor="{StaticResource Gold}" VerticalOptions="Center" />
-                                    <BoxView Grid.Column="1" Color="{Binding Color, Converter={StaticResource PlayerColor}}" WidthRequest="18" HeightRequest="18" CornerRadius="9" VerticalOptions="Center" />
-                                    <Label Grid.Column="2" Text="{Binding Name}" FontSize="18" VerticalOptions="Center" />
-                                </Grid>
-                            </Border>
-                        </DataTemplate>
-                    </BindableLayout.ItemTemplate>
-                </VerticalStackLayout>
-                <Label Text="{Binding Error}" IsVisible="{Binding HasError}" Style="{StaticResource ErrorText}" />
-            </VerticalStackLayout>
+                <Border Style="{StaticResource Ribbon}">
+                    <Label x:Name="RibbonLabel" Text="Game over" Style="{StaticResource RibbonText}" />
+                </Border>
+            </Grid>
         </ScrollView>
-        <VerticalStackLayout Grid.Row="1" Padding="24,8,24,24" Spacing="10">
-            <Button Text="{Binding PlayAgainText}" Command="{Binding PlayAgainCommand}" />
-            <Button Text="Home" Command="{Binding HomeCommand}" Style="{StaticResource SecondaryButton}" />
-        </VerticalStackLayout>
+        <controls:ConfettiView x:Name="Confetti" />
     </Grid>
 </views:BasePage>

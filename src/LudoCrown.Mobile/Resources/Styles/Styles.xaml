@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
+<!-- Classic mobile-Ludo look in Ludo Crown's own theme: chunky 3D buttons, glossy tiles, ribbon panels, rounded game font. -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
 
@@ -16,24 +17,29 @@
 
     <Style TargetType="Label">
         <Setter Property="TextColor" Value="{StaticResource Ivory}" />
+        <Setter Property="FontFamily" Value="BalooSemi" />
         <Setter Property="FontSize" Value="16" />
     </Style>
 
     <Style x:Key="Title" TargetType="Label">
-        <Setter Property="FontSize" Value="28" />
-        <Setter Property="FontAttributes" Value="Bold" />
-        <Setter Property="TextColor" Value="{StaticResource Ivory}" />
+        <Setter Property="FontFamily" Value="BalooHeavy" />
+        <Setter Property="FontSize" Value="30" />
+        <Setter Property="TextColor" Value="{StaticResource GoldLight}" />
         <Setter Property="SemanticProperties.HeadingLevel" Value="Level1" />
+        <Setter Property="Shadow">
+            <Shadow Brush="#3A1460" Offset="0,3" Radius="0" Opacity="1" />
+        </Setter>
     </Style>
 
     <Style x:Key="Heading" TargetType="Label">
-        <Setter Property="FontSize" Value="19" />
-        <Setter Property="FontAttributes" Value="Bold" />
-        <Setter Property="TextColor" Value="{StaticResource Gold}" />
+        <Setter Property="FontFamily" Value="BalooHeavy" />
+        <Setter Property="FontSize" Value="18" />
+        <Setter Property="TextColor" Value="{StaticResource GoldLight}" />
         <Setter Property="SemanticProperties.HeadingLevel" Value="Level2" />
     </Style>
 
     <Style x:Key="Caption" TargetType="Label">
+        <Setter Property="FontFamily" Value="BalooSemi" />
         <Setter Property="FontSize" Value="14" />
         <Setter Property="TextColor" Value="{StaticResource Muted}" />
     </Style>
@@ -44,15 +50,46 @@
         <Setter Property="HorizontalTextAlignment" Value="Center" />
     </Style>
 
-    <!-- Buttons: minimum 50pt tall for comfortable touch targets. -->
+    <!-- Labels on lobby tiles: white, chunky, with a dark outline-like shadow. -->
+    <Style x:Key="TileLabel" TargetType="Label">
+        <Setter Property="FontFamily" Value="BalooHeavy" />
+        <Setter Property="FontSize" Value="21" />
+        <Setter Property="TextColor" Value="White" />
+        <Setter Property="HorizontalTextAlignment" Value="Center" />
+        <Setter Property="Shadow">
+            <Shadow Brush="#000000" Offset="0,2" Radius="1" Opacity="0.55" />
+        </Setter>
+    </Style>
+    <Style x:Key="TileNumber" TargetType="Label">
+        <Setter Property="FontFamily" Value="BalooHeavy" />
+        <Setter Property="FontSize" Value="64" />
+        <Setter Property="TextColor" Value="{StaticResource Ivory}" />
+        <Setter Property="HorizontalTextAlignment" Value="Center" />
+        <Setter Property="Shadow">
+            <Shadow Brush="#1A1230" Offset="0,4" Radius="0" Opacity="1" />
+        </Setter>
+    </Style>
+    <Style x:Key="PillText" TargetType="Label">
+        <Setter Property="FontFamily" Value="BalooHeavy" />
+        <Setter Property="FontSize" Value="16" />
+        <Setter Property="TextColor" Value="White" />
+        <Setter Property="VerticalOptions" Value="Center" />
+    </Style>
+
+    <!-- Buttons: chunky 3D gold by default; minimum 50pt tall for comfortable touch targets. -->
     <Style TargetType="Button">
         <Setter Property="Background" Value="{StaticResource GoldBrush}" />
-        <Setter Property="TextColor" Value="{StaticResource Ink}" />
-        <Setter Property="FontAttributes" Value="Bold" />
-        <Setter Property="FontSize" Value="17" />
+        <Setter Property="TextColor" Value="#4A2A00" />
+        <Setter Property="FontFamily" Value="BalooHeavy" />
+        <Setter Property="FontSize" Value="18" />
         <Setter Property="CornerRadius" Value="16" />
-        <Setter Property="MinimumHeightRequest" Value="50" />
-        <Setter Property="Padding" Value="18,12" />
+        <Setter Property="BorderColor" Value="#FFF1C2" />
+        <Setter Property="BorderWidth" Value="2" />
+        <Setter Property="MinimumHeightRequest" Value="52" />
+        <Setter Property="Padding" Value="18,10" />
+        <Setter Property="Shadow">
+            <Shadow Brush="#8A5A12" Offset="0,4" Radius="0" Opacity="1" />
+        </Setter>
         <Setter Property="VisualStateManager.VisualStateGroups">
             <VisualStateGroupList>
                 <VisualStateGroup x:Name="CommonStates">
@@ -64,7 +101,7 @@
                     </VisualState>
                     <VisualState x:Name="Pressed">
                         <VisualState.Setters>
-                            <Setter Property="Scale" Value="0.97" />
+                            <Setter Property="TranslationY" Value="3" />
                         </VisualState.Setters>
                     </VisualState>
                 </VisualStateGroup>
@@ -73,53 +110,138 @@
     </Style>
 
     <Style x:Key="SecondaryButton" TargetType="Button">
-        <Setter Property="Background" Value="{StaticResource Plum}" />
-        <Setter Property="TextColor" Value="{StaticResource Ivory}" />
-        <Setter Property="BorderColor" Value="{StaticResource PlumLight}" />
+        <Setter Property="Background" Value="{StaticResource VioletBrush}" />
+        <Setter Property="TextColor" Value="White" />
+        <Setter Property="BorderColor" Value="#B9A2FF" />
         <Setter Property="BorderWidth" Value="1.5" />
-        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="FontFamily" Value="BalooHeavy" />
         <Setter Property="FontSize" Value="16" />
         <Setter Property="CornerRadius" Value="16" />
         <Setter Property="MinimumHeightRequest" Value="50" />
-        <Setter Property="Padding" Value="16,12" />
+        <Setter Property="Padding" Value="16,10" />
+        <Setter Property="Shadow">
+            <Shadow Brush="#2D1470" Offset="0,4" Radius="0" Opacity="1" />
+        </Setter>
+        <Setter Property="VisualStateManager.VisualStateGroups">
+            <VisualStateGroupList>
+                <VisualStateGroup x:Name="CommonStates">
+                    <VisualState x:Name="Normal" />
+                    <VisualState x:Name="Disabled">
+                        <VisualState.Setters>
+                            <Setter Property="Opacity" Value="0.45" />
+                        </VisualState.Setters>
+                    </VisualState>
+                    <VisualState x:Name="Pressed">
+                        <VisualState.Setters>
+                            <Setter Property="TranslationY" Value="3" />
+                        </VisualState.Setters>
+                    </VisualState>
+                </VisualStateGroup>
+            </VisualStateGroupList>
+        </Setter>
     </Style>
 
     <Style x:Key="LinkButton" TargetType="Button">
         <Setter Property="Background" Value="Transparent" />
-        <Setter Property="TextColor" Value="{StaticResource Gold}" />
+        <Setter Property="TextColor" Value="{StaticResource GoldLight}" />
+        <Setter Property="FontFamily" Value="BalooBold" />
         <Setter Property="FontSize" Value="16" />
+        <Setter Property="BorderWidth" Value="0" />
         <Setter Property="MinimumHeightRequest" Value="44" />
         <Setter Property="Padding" Value="8" />
+        <Setter Property="Shadow" Value="{x:Null}" />
     </Style>
 
     <Style x:Key="DangerButton" TargetType="Button">
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="TextColor" Value="{StaticResource Danger}" />
-        <Setter Property="BorderColor" Value="{StaticResource Danger}" />
-        <Setter Property="BorderWidth" Value="1.5" />
+        <Setter Property="Background" Value="{StaticResource RedBrush}" />
+        <Setter Property="TextColor" Value="White" />
+        <Setter Property="BorderColor" Value="White" />
+        <Setter Property="BorderWidth" Value="2" />
+        <Setter Property="FontFamily" Value="BalooHeavy" />
         <Setter Property="CornerRadius" Value="16" />
         <Setter Property="MinimumHeightRequest" Value="50" />
+        <Setter Property="Shadow">
+            <Shadow Brush="#8F1F12" Offset="0,4" Radius="0" Opacity="1" />
+        </Setter>
+    </Style>
+
+    <!-- Round icon button (top bars). -->
+    <Style x:Key="IconButton" TargetType="ImageButton">
+        <Setter Property="WidthRequest" Value="46" />
+        <Setter Property="HeightRequest" Value="46" />
+        <Setter Property="Padding" Value="10" />
+        <Setter Property="CornerRadius" Value="14" />
+        <Setter Property="BorderColor" Value="#40FFFFFF" />
+        <Setter Property="BorderWidth" Value="2" />
+        <Setter Property="Background" Value="{StaticResource VioletBrush}" />
+        <Setter Property="Shadow">
+            <Shadow Brush="#0A0418" Offset="0,3" Radius="0" Opacity="0.7" />
+        </Setter>
     </Style>
 
     <Style x:Key="Card" TargetType="Border">
-        <Setter Property="Background" Value="{StaticResource Velvet}" />
-        <Setter Property="Stroke" Value="{StaticResource PlumLight}" />
-        <Setter Property="StrokeThickness" Value="1" />
+        <Setter Property="Background" Value="{StaticResource CardBrush}" />
+        <Setter Property="Stroke" Value="#33FFFFFF" />
+        <Setter Property="StrokeThickness" Value="1.5" />
         <Setter Property="StrokeShape" Value="RoundRectangle 20" />
         <Setter Property="Padding" Value="16" />
+        <Setter Property="Shadow">
+            <Shadow Brush="#0A0418" Offset="0,5" Radius="0" Opacity="0.6" />
+        </Setter>
+    </Style>
+
+    <!-- Resource pills in the top bar (coins, gems, level). -->
+    <Style x:Key="Pill" TargetType="Border">
+        <Setter Property="Background" Value="#B30A051C" />
+        <Setter Property="Stroke" Value="#22FFFFFF" />
+        <Setter Property="StrokeThickness" Value="1" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 18" />
+        <Setter Property="HeightRequest" Value="36" />
+        <Setter Property="Padding" Value="4,0,10,0" />
+    </Style>
+
+    <!-- Game-style panel with a gold frame (used for pop-ups). -->
+    <Style x:Key="Panel" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource PanelBrush}" />
+        <Setter Property="Stroke" Value="{StaticResource Gold}" />
+        <Setter Property="StrokeThickness" Value="3" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 26" />
+        <Setter Property="Padding" Value="16,36,16,18" />
+        <Setter Property="Shadow">
+            <Shadow Brush="#000000" Offset="0,14" Radius="30" Opacity="0.6" />
+        </Setter>
+    </Style>
+    <Style x:Key="Ribbon" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource GoldBrush}" />
+        <Setter Property="Stroke" Value="#FFF1C2" />
+        <Setter Property="StrokeThickness" Value="3" />
+        <Setter Property="StrokeShape" Value="RoundRectangle 14" />
+        <Setter Property="Padding" Value="28,4,28,6" />
+        <Setter Property="HorizontalOptions" Value="Center" />
+        <Setter Property="VerticalOptions" Value="Start" />
+        <Setter Property="Shadow">
+            <Shadow Brush="#8A5A12" Offset="0,5" Radius="0" Opacity="1" />
+        </Setter>
+    </Style>
+    <Style x:Key="RibbonText" TargetType="Label">
+        <Setter Property="FontFamily" Value="BalooHeavy" />
+        <Setter Property="FontSize" Value="20" />
+        <Setter Property="TextColor" Value="#4A2A00" />
+        <Setter Property="HorizontalTextAlignment" Value="Center" />
     </Style>
 
     <Style TargetType="Entry">
-        <Setter Property="TextColor" Value="{StaticResource Ink}" />
+        <Setter Property="TextColor" Value="White" />
         <Setter Property="PlaceholderColor" Value="#8A7FA8" />
-        <Setter Property="BackgroundColor" Value="{StaticResource Ivory}" />
+        <Setter Property="BackgroundColor" Value="#990A051C" />
+        <Setter Property="FontFamily" Value="BalooBold" />
         <Setter Property="FontSize" Value="18" />
         <Setter Property="MinimumHeightRequest" Value="50" />
     </Style>
 
     <Style TargetType="Switch">
-        <Setter Property="OnColor" Value="{StaticResource GoldDeep}" />
-        <Setter Property="ThumbColor" Value="{StaticResource Ivory}" />
+        <Setter Property="OnColor" Value="{StaticResource Emerald}" />
+        <Setter Property="ThumbColor" Value="White" />
     </Style>
 
     <Style TargetType="ActivityIndicator">
@@ -129,6 +251,7 @@
     <Style TargetType="Picker">
         <Setter Property="TextColor" Value="{StaticResource Ivory}" />
         <Setter Property="TitleColor" Value="{StaticResource Muted}" />
+        <Setter Property="FontFamily" Value="BalooBold" />
         <Setter Property="MinimumHeightRequest" Value="44" />
     </Style>
 </ResourceDictionary>

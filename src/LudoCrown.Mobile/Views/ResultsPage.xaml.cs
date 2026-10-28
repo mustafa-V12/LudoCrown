@@ -9,8 +9,13 @@ public partial class ResultsPage : BasePage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+        var vm = (ResultsViewModel)BindingContext;
+        // The view model fills its texts in OnAppearingAsync; give it a moment before reading Won.
+        await Task.Delay(50);
+        RibbonLabel.Text = vm.Won ? "Victory" : "Game over";
         Crown.Scale = 0.6;
         Crown.Rotation = -8;
+        if (vm.Won) Confetti.Burst();
         await Task.WhenAll(Crown.ScaleTo(1, 450, Easing.SpringOut), Crown.RotateTo(0, 450, Easing.SpringOut));
     }
 

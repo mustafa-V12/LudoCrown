@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8" ?>
+<!-- The lobby, in the classic mobile-Ludo layout: resource bar, profile card, big play tiles, small tiles, bottom bar. -->
 <views:BasePage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
                 xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
                 xmlns:views="clr-namespace:LudoCrown.Mobile.Views"
@@ -6,120 +7,217 @@
                 xmlns:vm="clr-namespace:LudoCrown.App.ViewModels;assembly=LudoCrown.App.Logic"
                 x:Class="LudoCrown.Mobile.Views.HomePage"
                 x:DataType="vm:HomeViewModel">
-    <ScrollView>
-        <VerticalStackLayout Padding="20,12,20,28" Spacing="16" MaximumWidthRequest="520">
+    <Grid RowDefinitions="*,Auto">
+        <ScrollView>
+            <VerticalStackLayout Padding="14,8,14,20" Spacing="12" MaximumWidthRequest="520">
 
-            <!-- Profile bar -->
-            <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="8">
-                <controls:AvatarView AvatarId="{Binding AvatarId}" Size="52" VerticalOptions="Center">
-                    <controls:AvatarView.GestureRecognizers>
-                        <TapGestureRecognizer Command="{Binding ProfileCommand}" />
-                    </controls:AvatarView.GestureRecognizers>
-                </controls:AvatarView>
-                <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
-                    <Label Text="{Binding DisplayName}" FontAttributes="Bold" FontSize="18" LineBreakMode="TailTruncation" />
-                    <Label Text="{Binding LevelText}" Style="{StaticResource Caption}" />
-                </VerticalStackLayout>
-                <Border Grid.Column="2" IsVisible="{Binding IsSignedIn}" Style="{StaticResource Card}" Padding="12,6" StrokeShape="RoundRectangle 16" VerticalOptions="Center">
-                    <HorizontalStackLayout Spacing="6">
-                        <Ellipse Fill="{StaticResource GoldBrush}" WidthRequest="16" HeightRequest="16" VerticalOptions="Center" />
-                        <Label Text="{Binding CoinsText}" FontAttributes="Bold" VerticalOptions="Center" SemanticProperties.Description="Coins" />
-                    </HorizontalStackLayout>
-                </Border>
-                <Border Grid.Column="3" IsVisible="{Binding IsSignedIn}" Style="{StaticResource Card}" Padding="12,6" StrokeShape="RoundRectangle 16" VerticalOptions="Center">
-                    <Border.GestureRecognizers>
-                        <TapGestureRecognizer Command="{Binding StoreCommand}" />
-                    </Border.GestureRecognizers>
-                    <HorizontalStackLayout Spacing="6">
-                        <Label Text="💎" FontSize="15" VerticalOptions="Center" />
-                        <Label Text="{Binding GemsText}" FontAttributes="Bold" VerticalOptions="Center" SemanticProperties.Description="Gems" />
-                    </HorizontalStackLayout>
-                </Border>
-                <Button Grid.Column="4" Text="⚙" FontSize="22" Command="{Binding SettingsCommand}" Style="{StaticResource LinkButton}"
-                        WidthRequest="48" SemanticProperties.Description="Settings" />
-            </Grid>
-
-            <!-- Which backend is in use: offline, local development server, or live. -->
-            <Border Padding="12,6" StrokeShape="RoundRectangle 12" StrokeThickness="1" HorizontalOptions="Center"
-                    Stroke="{StaticResource PlumLight}" Background="{StaticResource Plum}">
-                <Label Text="{Binding EnvironmentText}" FontSize="12" TextColor="{StaticResource Muted}" HorizontalTextAlignment="Center" />
-            </Border>
-
-            <Border Style="{StaticResource Card}" IsVisible="{Binding IsGuest}" Padding="14,10">
-                <Grid ColumnDefinitions="*,Auto">
-                    <Label Text="You're playing as a guest. Link an account to keep your progress." Style="{StaticResource Caption}" VerticalOptions="Center" />
-                    <Button Grid.Column="1" Text="Link" Command="{Binding ProfileCommand}" Style="{StaticResource LinkButton}" />
+                <!-- Resource bar: level, coins (+), gems (+), settings -->
+                <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto" ColumnSpacing="8">
+                    <Border Style="{StaticResource Pill}" IsVisible="{Binding IsSignedIn}">
+                        <HorizontalStackLayout Spacing="4">
+                            <Image Source="icon_crown.png" WidthRequest="28" HeightRequest="24" VerticalOptions="Center" />
+                            <Label Text="{Binding LevelText}" Style="{StaticResource PillText}" />
+                        </HorizontalStackLayout>
+                    </Border>
+                    <Border Grid.Column="1" Style="{StaticResource Pill}" IsVisible="{Binding IsSignedIn}" SemanticProperties.Description="Coins. Open the store">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding StoreCommand}" />
+                        </Border.GestureRecognizers>
+                        <HorizontalStackLayout Spacing="4">
+                            <Image Source="icon_coin.png" WidthRequest="28" HeightRequest="28" VerticalOptions="Center" />
+                            <Label Text="{Binding CoinsText}" Style="{StaticResource PillText}" />
+                            <Border WidthRequest="20" HeightRequest="20" StrokeShape="RoundRectangle 10" Background="{StaticResource Emerald}" Stroke="White" StrokeThickness="1.5" VerticalOptions="Center" Margin="2,0,-4,0">
+                                <Label Text="+" FontFamily="BalooHeavy" FontSize="15" HorizontalOptions="Center" VerticalOptions="Center" Margin="0,-2,0,0" />
+                            </Border>
+                        </HorizontalStackLayout>
+                    </Border>
+                    <Border Grid.Column="2" Style="{StaticResource Pill}" IsVisible="{Binding IsSignedIn}" SemanticProperties.Description="Gems. Open the store">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding StoreCommand}" />
+                        </Border.GestureRecognizers>
+                        <HorizontalStackLayout Spacing="4">
+                            <Image Source="icon_gem.png" WidthRequest="28" HeightRequest="28" VerticalOptions="Center" />
+                            <Label Text="{Binding GemsText}" Style="{StaticResource PillText}" />
+                            <Border WidthRequest="20" HeightRequest="20" StrokeShape="RoundRectangle 10" Background="{StaticResource Emerald}" Stroke="White" StrokeThickness="1.5" VerticalOptions="Center" Margin="2,0,-4,0">
+                                <Label Text="+" FontFamily="BalooHeavy" FontSize="15" HorizontalOptions="Center" VerticalOptions="Center" Margin="0,-2,0,0" />
+                            </Border>
+                        </HorizontalStackLayout>
+                    </Border>
+                    <ImageButton Grid.Column="4" Source="icon_settings.png" Style="{StaticResource IconButton}" Command="{Binding SettingsCommand}"
+                                 SemanticProperties.Description="Settings" />
                 </Grid>
-            </Border>
 
-            <!-- Hero -->
-            <VerticalStackLayout Spacing="4" Margin="0,8">
-                <Image Source="crown_logo.png" WidthRequest="110" HeightRequest="82" SemanticProperties.Description="Ludo Crown logo" />
-                <Label Text="Ludo Crown" Style="{StaticResource Title}" HorizontalOptions="Center" />
+                <!-- Profile card + mini cards -->
+                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                    <Border Style="{StaticResource Card}" Padding="6,6,12,6" StrokeShape="RoundRectangle 18">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding ProfileCommand}" />
+                        </Border.GestureRecognizers>
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                            <controls:AvatarView AvatarId="{Binding AvatarId}" Size="62" RingColor="{StaticResource Ruby}" VerticalOptions="Center" />
+                            <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="-4">
+                                <Label Text="{Binding DisplayName}" FontFamily="BalooHeavy" FontSize="18" LineBreakMode="TailTruncation" />
+                                <Label Text="{Binding LevelText}" Style="{StaticResource Caption}" FontFamily="BalooBold" />
+                            </VerticalStackLayout>
+                        </Grid>
+                    </Border>
+                    <Border Grid.Column="1" Style="{StaticResource Card}" Padding="8,6" WidthRequest="78" StrokeShape="RoundRectangle 16" SemanticProperties.Description="League">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding LeagueCommand}" />
+                        </Border.GestureRecognizers>
+                        <VerticalStackLayout Spacing="0" VerticalOptions="Center">
+                            <Image Source="icon_trophy.png" HeightRequest="40" />
+                            <Label Text="League" FontFamily="BalooHeavy" FontSize="13" HorizontalOptions="Center" />
+                        </VerticalStackLayout>
+                    </Border>
+                    <Border Grid.Column="2" Style="{StaticResource Card}" Padding="8,6" WidthRequest="78" StrokeShape="RoundRectangle 16" SemanticProperties.Description="How to play">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding RulesCommand}" />
+                        </Border.GestureRecognizers>
+                        <VerticalStackLayout Spacing="0" VerticalOptions="Center">
+                            <Image Source="icon_crown.png" HeightRequest="40" />
+                            <Label Text="Rules" FontFamily="BalooHeavy" FontSize="13" HorizontalOptions="Center" />
+                        </VerticalStackLayout>
+                    </Border>
+                </Grid>
+
+                <!-- Which backend is in use: offline, local development server, or live. -->
+                <Border Padding="12,2" StrokeShape="RoundRectangle 12" StrokeThickness="1" HorizontalOptions="Center"
+                        Stroke="#33FFFFFF" Background="#660A051C">
+                    <Label Text="{Binding EnvironmentText}" FontSize="12" TextColor="{StaticResource Muted}" HorizontalTextAlignment="Center" />
+                </Border>
+
+                <Border Style="{StaticResource Card}" IsVisible="{Binding IsGuest}" Padding="12,4">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Text="Playing as a guest. Link an account to keep your progress." Style="{StaticResource Caption}" VerticalOptions="Center" />
+                        <Button Grid.Column="1" Text="Link" Command="{Binding ProfileCommand}" Style="{StaticResource LinkButton}" />
+                    </Grid>
+                </Border>
+
+                <!-- Logo -->
+                <Grid HeightRequest="120" Margin="0,2">
+                    <Image Source="crown_logo.png" WidthRequest="90" HeightRequest="66" VerticalOptions="Start" SemanticProperties.Description="Ludo Crown" />
+                    <VerticalStackLayout VerticalOptions="End" Spacing="-18">
+                        <Label Text="LUDO" Style="{StaticResource Title}" FontSize="44" HorizontalOptions="Center" CharacterSpacing="2" />
+                        <Label Text="CROWN" Style="{StaticResource Title}" FontSize="30" HorizontalOptions="Center" CharacterSpacing="8" />
+                    </VerticalStackLayout>
+                </Grid>
+
+                <!-- Unfinished offline game -->
+                <Border Style="{StaticResource Card}" IsVisible="{Binding HasSavedGame}" Stroke="{StaticResource Gold}" StrokeThickness="2" Padding="12,8">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                        <VerticalStackLayout VerticalOptions="Center" Spacing="-4">
+                            <Label Text="Continue game" FontFamily="BalooHeavy" FontSize="17" />
+                            <Label Text="Your offline game is saved." Style="{StaticResource Caption}" />
+                        </VerticalStackLayout>
+                        <Button Grid.Column="1" Text="GO" Command="{Binding PlayOfflineCommand}" Padding="18,4" MinimumHeightRequest="44" />
+                    </Grid>
+                </Border>
+
+                <!-- Big tiles -->
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                    <controls:GameTile Variant="gold" Art="tile_2p.png" Number="2" Title="2 Players" Subtitle="Online match" Tapped="OnTwoPlayers" />
+                    <controls:GameTile Grid.Column="1" Variant="violet" Art="tile_league.png" Title="League" Subtitle="Season ranking" Command="{Binding LeagueCommand}" />
+                </Grid>
+
+                <!-- Small tiles -->
+                <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
+                    <controls:GameTile Art="tile_private.png" Title="Private Table" Subtitle="Play with friends" Tapped="OnPrivateTable" />
+                    <controls:GameTile Grid.Column="1" Art="tile_offline.png" Title="Offline" Subtitle="vs Computer" Command="{Binding PlayOfflineCommand}" />
+                    <controls:GameTile Grid.Column="2" Art="tile_4p.png" Number="4" Title="4 Players" Subtitle="Online match" Tapped="OnFourPlayers" />
+                </Grid>
+
+                <Button Text="Sign in to play online" IsVisible="{Binding IsSignedOut}" Command="{Binding SignInCommand}" />
             </VerticalStackLayout>
+        </ScrollView>
 
-            <!-- Game mode: chosen before the match, fixed once it starts -->
-            <Border Style="{StaticResource Card}">
-                <VerticalStackLayout Spacing="10">
-                    <Label Text="Game mode" Style="{StaticResource Heading}" />
-                    <controls:ModeSelector Picker="{Binding Modes}" />
-                    <Label Text="{Binding Modes.SelectedSummary}" FontAttributes="Bold" />
-                    <Label Text="{Binding Modes.SelectedDescription}" Style="{StaticResource Caption}" />
+        <!-- Bottom bar -->
+        <Border Grid.Row="1" Background="{StaticResource BottomBarBrush}" StrokeThickness="0" Padding="6,6,6,4">
+            <Grid ColumnDefinitions="*,*,1.2*,*,*">
+                <BoxView Grid.ColumnSpan="5" HeightRequest="2" Color="#73E9B949" VerticalOptions="Start" Margin="-6,-6,-6,0" />
+                <VerticalStackLayout Spacing="0" SemanticProperties.Description="Store">
+                    <VerticalStackLayout.GestureRecognizers><TapGestureRecognizer Command="{Binding StoreCommand}" /></VerticalStackLayout.GestureRecognizers>
+                    <Image Source="icon_store.png" HeightRequest="28" />
+                    <Label Text="Store" FontFamily="BalooBold" FontSize="12" TextColor="{StaticResource Muted}" HorizontalOptions="Center" />
                 </VerticalStackLayout>
-            </Border>
-
-            <!-- Online play -->
-            <Border Style="{StaticResource Card}">
-                <VerticalStackLayout Spacing="12">
-                    <Label Text="Play online" Style="{StaticResource Heading}" />
-                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
-                        <Button Text="Ranked" Command="{Binding SelectQueueCommand}" CommandParameter="ranked" Style="{StaticResource SecondaryButton}"
-                                BorderColor="{Binding IsRanked, Converter={StaticResource EqualsToColor}, ConverterParameter=True}" BorderWidth="2.5" />
-                        <Button Grid.Column="1" Text="Casual" Command="{Binding SelectQueueCommand}" CommandParameter="casual" Style="{StaticResource SecondaryButton}"
-                                BorderColor="{Binding IsCasual, Converter={StaticResource EqualsToColor}, ConverterParameter=True}" BorderWidth="2.5" />
-                    </Grid>
-                    <Label Text="{Binding QueueDescription}" Style="{StaticResource Caption}" />
-                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
-                        <Button Text="2 players" Command="{Binding PlayOnlineCommand}" CommandParameter="2" />
-                        <Button Grid.Column="1" Text="4 players" Command="{Binding PlayOnlineCommand}" CommandParameter="4" />
-                    </Grid>
+                <VerticalStackLayout Grid.Column="1" Spacing="0" SemanticProperties.Description="Friends">
+                    <VerticalStackLayout.GestureRecognizers><TapGestureRecognizer Command="{Binding FriendsCommand}" /></VerticalStackLayout.GestureRecognizers>
+                    <Image Source="icon_friends.png" HeightRequest="28" />
+                    <Label Text="Friends" FontFamily="BalooBold" FontSize="12" TextColor="{StaticResource Muted}" HorizontalOptions="Center" />
                 </VerticalStackLayout>
-            </Border>
-
-            <!-- Private table -->
-            <Border Style="{StaticResource Card}">
-                <VerticalStackLayout Spacing="12">
-                    <Label Text="Private table" Style="{StaticResource Heading}" />
-                    <Label Text="Play with friends using a table code." Style="{StaticResource Caption}" />
-                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
-                        <Button Text="Create table" Command="{Binding CreateTableCommand}" Style="{StaticResource SecondaryButton}" />
-                        <Button Grid.Column="1" Text="Join with code" Command="{Binding JoinTableCommand}" Style="{StaticResource SecondaryButton}" />
-                    </Grid>
+                <VerticalStackLayout Grid.Column="2" Spacing="0" TranslationY="-22" SemanticProperties.Description="Lobby">
+                    <Border WidthRequest="64" HeightRequest="64" StrokeShape="RoundRectangle 32" Background="{StaticResource GoldBrush}" Stroke="#FFF3C9" StrokeThickness="3" Padding="14">
+                        <Border.Shadow><Shadow Brush="#8A5A12" Offset="0,4" Radius="0" Opacity="1" /></Border.Shadow>
+                        <Image Source="icon_home.png" />
+                    </Border>
+                    <Label Text="Lobby" FontFamily="BalooHeavy" FontSize="13" TextColor="{StaticResource Gold}" HorizontalOptions="Center" />
                 </VerticalStackLayout>
-            </Border>
-
-            <!-- Offline -->
-            <Border Style="{StaticResource Card}">
-                <VerticalStackLayout Spacing="12">
-                    <Label Text="Play offline" Style="{StaticResource Heading}" />
-                    <Label Text="Challenge the computer or pass the phone around — no internet needed." Style="{StaticResource Caption}" />
-                    <Label Text="You have an unfinished game." IsVisible="{Binding HasSavedGame}" TextColor="{StaticResource Gold}" FontSize="14" />
-                    <Button Text="Play vs computer" Command="{Binding PlayOfflineCommand}" Style="{StaticResource SecondaryButton}" />
+                <VerticalStackLayout Grid.Column="3" Spacing="0" SemanticProperties.Description="How to play">
+                    <VerticalStackLayout.GestureRecognizers><TapGestureRecognizer Command="{Binding RulesCommand}" /></VerticalStackLayout.GestureRecognizers>
+                    <Image Source="icon_book.png" HeightRequest="28" />
+                    <Label Text="Rules" FontFamily="BalooBold" FontSize="12" TextColor="{StaticResource Muted}" HorizontalOptions="Center" />
                 </VerticalStackLayout>
-            </Border>
-
-            <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
-                <Button Text="🏆 League" Command="{Binding LeagueCommand}" Style="{StaticResource SecondaryButton}" />
-                <Button Grid.Column="1" Text="🛒 Store" Command="{Binding StoreCommand}" Style="{StaticResource SecondaryButton}" />
+                <VerticalStackLayout Grid.Column="4" Spacing="0" SemanticProperties.Description="Profile">
+                    <VerticalStackLayout.GestureRecognizers><TapGestureRecognizer Command="{Binding ProfileCommand}" /></VerticalStackLayout.GestureRecognizers>
+                    <Image Source="icon_profile.png" HeightRequest="28" />
+                    <Label Text="Profile" FontFamily="BalooBold" FontSize="12" TextColor="{StaticResource Muted}" HorizontalOptions="Center" />
+                </VerticalStackLayout>
             </Grid>
+        </Border>
 
-            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
-                <Button Text="Profile" Command="{Binding ProfileCommand}" Style="{StaticResource LinkButton}" />
-                <Button Grid.Column="1" Text="Friends" Command="{Binding FriendsCommand}" Style="{StaticResource LinkButton}" />
-                <Button Grid.Column="2" Text="How to play" Command="{Binding RulesCommand}" Style="{StaticResource LinkButton}" />
+        <!-- Pop-up: choose mode and queue for an online match -->
+        <Grid x:Name="ModeOverlay" Grid.RowSpan="2" IsVisible="False" Padding="16,40,16,20">
+            <BoxView Color="#B8080316" Margin="-16,-40,-16,-20">
+                <BoxView.GestureRecognizers><TapGestureRecognizer Tapped="OnCloseOverlay" /></BoxView.GestureRecognizers>
+            </BoxView>
+            <Grid VerticalOptions="Center" MaximumWidthRequest="440">
+                <Border Style="{StaticResource Panel}" Margin="0,22,0,0">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="Game mode" Style="{StaticResource Heading}" />
+                        <controls:ModeSelector Picker="{Binding Modes}" />
+                        <Label Text="{Binding Modes.SelectedSummary}" FontFamily="BalooBold" HorizontalTextAlignment="Center" />
+                        <Label Text="Match type" Style="{StaticResource Heading}" Margin="0,4,0,0" />
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                            <Button Text="Ranked" Command="{Binding SelectQueueCommand}" CommandParameter="ranked" Style="{StaticResource SecondaryButton}"
+                                    BorderColor="{Binding IsRanked, Converter={StaticResource EqualsToColor}, ConverterParameter=True}" BorderWidth="3" />
+                            <Button Grid.Column="1" Text="Casual" Command="{Binding SelectQueueCommand}" CommandParameter="casual" Style="{StaticResource SecondaryButton}"
+                                    BorderColor="{Binding IsCasual, Converter={StaticResource EqualsToColor}, ConverterParameter=True}" BorderWidth="3" />
+                        </Grid>
+                        <Label Text="{Binding QueueDescription}" Style="{StaticResource Caption}" HorizontalTextAlignment="Center" />
+                        <Button Text="PLAY" FontSize="22" MinimumHeightRequest="58" Margin="0,6,0,0" Clicked="OnPlayOnline" />
+                    </VerticalStackLayout>
+                </Border>
+                <Border Style="{StaticResource Ribbon}">
+                    <Label x:Name="ModeTitle" Text="2 Players" Style="{StaticResource RibbonText}" />
+                </Border>
+                <ImageButton Source="icon_close.png" HorizontalOptions="End" VerticalOptions="Start" Margin="0,8,-8,0" WidthRequest="42" HeightRequest="42" Padding="8"
+                             CornerRadius="12" BorderColor="White" BorderWidth="3" Background="{StaticResource RedBrush}" Clicked="OnCloseOverlay"
+                             SemanticProperties.Description="Close" />
             </Grid>
+        </Grid>
 
-            <Button Text="Sign in to play online" IsVisible="{Binding IsSignedOut}" Command="{Binding SignInCommand}" />
-        </VerticalStackLayout>
-    </ScrollView>
+        <!-- Pop-up: private table -->
+        <Grid x:Name="PrivateOverlay" Grid.RowSpan="2" IsVisible="False" Padding="16,40,16,20">
+            <BoxView Color="#B8080316" Margin="-16,-40,-16,-20">
+                <BoxView.GestureRecognizers><TapGestureRecognizer Tapped="OnCloseOverlay" /></BoxView.GestureRecognizers>
+            </BoxView>
+            <Grid VerticalOptions="Center" MaximumWidthRequest="440">
+                <Border Style="{StaticResource Panel}" Margin="0,22,0,0">
+                    <VerticalStackLayout Spacing="12">
+                        <Image Source="tile_private.png" HeightRequest="90" />
+                        <Label Text="Play with friends using a 6-character table code. The mode you pick here is used for the table." Style="{StaticResource Caption}" HorizontalTextAlignment="Center" />
+                        <controls:ModeSelector Picker="{Binding Modes}" />
+                        <Button Text="CREATE TABLE" Clicked="OnCreateTable" />
+                        <Button Text="JOIN WITH CODE" Style="{StaticResource SecondaryButton}" Clicked="OnJoinTable" />
+                    </VerticalStackLayout>
+                </Border>
+                <Border Style="{StaticResource Ribbon}">
+                    <Label Text="Private Table" Style="{StaticResource RibbonText}" />
+                </Border>
+                <ImageButton Source="icon_close.png" HorizontalOptions="End" VerticalOptions="Start" Margin="0,8,-8,0" WidthRequest="42" HeightRequest="42" Padding="8"
+                             CornerRadius="12" BorderColor="White" BorderWidth="3" Background="{StaticResource RedBrush}" Clicked="OnCloseOverlay"
+                             SemanticProperties.Description="Close" />
+            </Grid>
+        </Grid>
+    </Grid>
 </views:BasePage>
