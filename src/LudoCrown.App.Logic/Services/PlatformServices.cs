@@ -1,3 +1,4 @@
+using LudoCrown.Core.Model;
 using LudoCrown.Core.Protocol;
 
 namespace LudoCrown.App.Services;
@@ -34,6 +35,9 @@ public static class Routes
     public const string EmailSignIn = "emailsignin";
     public const string Rules = "rules";
     public const string BlockedPlayers = "blocked";
+    public const string Store = "store";
+    public const string League = "league";
+    public const string PlayerProfile = "player";
 }
 
 public interface INavigationService
@@ -123,14 +127,19 @@ public interface IMatchConnection : IAsyncDisposable
     Task ConnectAsync(CancellationToken ct = default);
     Task DisconnectAsync();
 
-    Task<MatchmakingStatus> FindMatchAsync(int playerCount);
+    Task<MatchmakingStatus> FindMatchAsync(int playerCount, GameMode mode, MatchQueue queue);
     Task CancelMatchmakingAsync();
-    Task<HubResult<RoomInfo>> CreatePrivateRoomAsync(int playerCount);
+    Task<HubResult<RoomInfo>> CreatePrivateRoomAsync(int playerCount, GameMode mode);
     Task<HubResult<RoomInfo>> JoinPrivateRoomAsync(string code);
     Task<HubResult<string>> StartPrivateRoomAsync(string roomId);
     Task<ServerError?> LeaveRoomAsync(string id);
     Task<ServerError?> RollAsync(string matchId, long expectedVersion);
     Task<ServerError?> MoveAsync(string matchId, int pieceIndex, long expectedVersion);
+    /// <summary>Gem reroll of the pending roll. Reuse the same <paramref name="requestId"/> when retrying so the server charges once.</summary>
+    Task<RerollResult> RerollAsync(string matchId, long expectedVersion, string requestId);
+    Task<ServerError?> PassTurnAsync(string matchId, long expectedVersion);
+    /// <summary>Drinks a Shield bottle. Reuse the same <paramref name="requestId"/> when retrying.</summary>
+    Task<BoostResult> UseBoostAsync(string matchId, long expectedVersion, string requestId);
     Task<MatchSnapshot?> ResyncAsync(string? matchId);
     Task<ServerError?> SendReactionAsync(string matchId, string reactionId);
     Task<HubResult<RoomInfo>> RequestRematchAsync(string matchId);
@@ -147,6 +156,42 @@ public static class SettingKeys
     public const string OfflineSave = "offline.save";
     public const string OfflineName = "offline.player_name";
     public const string SeenOnboarding = "app.seen_onboarding";
+    public const string ConfirmGemSpend = "settings.confirm_gem_spend";
+    public const string LastMode = "play.last_mode";
+    public const string LastQueue = "play.last_queue";
+}
+
+public enum StorePurchaseStatus { Purchased, Cancelled, Deferred, Failed }
+
+/// <summary>Result of asking the platform store (StoreKit) to buy a product.</summary>
+public sealed record StorePurchaseOutcome(StorePurchaseStatus Status, string? TransactionId = null, string? ProductId = null, string? Message = null);
+
+/// <summary>A completed store transaction the app has not finished yet (delivered after a crash, Ask to Buy approval, etc.).</summary>
+public sealed record UnfinishedTransaction(string TransactionId, string ProductId);
+
+/// <summary>
+/// Platform in-app purchases (StoreKit on iOS). The app never grants anything itself: after the store reports a purchase, the
+/// app sends the transaction id to the server, which verifies it with Apple and credits the account; only then does the app
+/// finish the transaction. Unsupported platforms (Windows, Android builds) report <see cref="IsSupported"/> = false.
+/// </summary>
+public interface IInAppPurchaseService
+{
+    bool IsSupported { get; }
+    /// <summary>Localised price strings from the store, keyed by product id. Missing ids are not sold/configured.</summary>
+    Task<IReadOnlyDictionary<string, string>> GetLocalizedPricesAsync(IReadOnlyList<string> productIds);
+    Task<StorePurchaseOutcome> PurchaseAsync(string productId, Guid appAccountToken);
+    Task<IReadOnlyList<UnfinishedTransaction>> GetUnfinishedTransactionsAsync();
+    Task FinishAsync(string transactionId);
+}
+
+/// <summary>Used where StoreKit is not available.</summary>
+public sealed class UnsupportedInAppPurchases : IInAppPurchaseService
+{
+    public bool IsSupported => false;
+    public Task<IReadOnlyDictionary<string, string>> GetLocalizedPricesAsync(IReadOnlyList<string> productIds) => Task.FromResult<IReadOnlyDictionary<string, string>>(new Dictionary<string, string>());
+    public Task<StorePurchaseOutcome> PurchaseAsync(string productId, Guid appAccountToken) => Task.FromResult(new StorePurchaseOutcome(StorePurchaseStatus.Failed, Message: "In-app purchases are not available on this device."));
+    public Task<IReadOnlyList<UnfinishedTransaction>> GetUnfinishedTransactionsAsync() => Task.FromResult<IReadOnlyList<UnfinishedTransaction>>(Array.Empty<UnfinishedTransaction>());
+    public Task FinishAsync(string transactionId) => Task.CompletedTask;
 }
 
 /// <summary>App configuration. The production server URL must be set before release (see docs/RELEASE_CHECKLIST.md).</summary>
@@ -162,4 +207,11 @@ public sealed class AppConfig
     public required string ServerUrl { get; init; }
     public bool IsDevelopment { get; init; }
     public bool ServerConfigured => !ServerUrl.Contains("YOUR-SERVER-HOST", StringComparison.Ordinal);
+
+    /// <summary>A local development server (localhost / emulator host / LAN address with a port).</summary>
+    public bool IsLocalServer => Uri.TryCreate(ServerUrl, UriKind.Absolute, out var u)
+                                 && (u.IsLoopback || u.Host == "10.0.2.2" || u.Host.EndsWith(".local", StringComparison.OrdinalIgnoreCase) || u.Scheme == "http");
+
+    /// <summary>Short label shown in the app so players and testers always know which backend they are using.</summary>
+    public string EnvironmentLabel => IsDevelopment || IsLocalServer ? $"Development server · {ServerUrl}" : "Online";
 }

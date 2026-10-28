@@ -25,8 +25,28 @@
                             </Grid>
                             <ProgressBar Progress="{Binding LevelProgress}" ProgressColor="{StaticResource Gold}" />
                             <Label Text="{Binding XpText}" Style="{StaticResource Caption}" />
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                                <Label Text="{Binding GemsText}" TextColor="{StaticResource Emerald}" FontAttributes="Bold" />
+                                <Label Grid.Column="1" Text="{Binding ShieldsText}" TextColor="{StaticResource Sapphire}" FontAttributes="Bold" HorizontalTextAlignment="End" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                                <Button Text="🛒 Store" Command="{Binding StoreCommand}" Style="{StaticResource SecondaryButton}" />
+                                <Button Grid.Column="1" Text="🏆 League" Command="{Binding LeagueCommand}" Style="{StaticResource SecondaryButton}" />
+                            </Grid>
                         </VerticalStackLayout>
                     </Border>
+
+                    <Label Text="Avatar frames" Style="{StaticResource Heading}" IsVisible="{Binding HasFrames}" />
+                    <FlexLayout BindableLayout.ItemsSource="{Binding Frames}" Wrap="Wrap" IsVisible="{Binding HasFrames}">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="vm:FrameOption">
+                                <Button Margin="4" Text="{Binding Name}" Style="{StaticResource SecondaryButton}"
+                                        BorderColor="{Binding IsEquipped, Converter={StaticResource EqualsToColor}, ConverterParameter=True}" BorderWidth="2"
+                                        Command="{Binding EquipFrameCommand, Source={RelativeSource AncestorType={x:Type vm:ProfileViewModel}}, x:DataType=vm:ProfileViewModel}"
+                                        CommandParameter="{Binding .}" />
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </FlexLayout>
 
                     <Label Text="Choose an avatar" Style="{StaticResource Heading}" />
                     <FlexLayout BindableLayout.ItemsSource="{Binding AvatarOptions}" Wrap="Wrap" JustifyContent="SpaceEvenly">
@@ -53,6 +73,32 @@
                         <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource Card}" Padding="10"><VerticalStackLayout><Label Text="{Binding CapturesText}" FontSize="22" FontAttributes="Bold" HorizontalOptions="Center" /><Label Text="Captures" Style="{StaticResource Caption}" HorizontalOptions="Center" /></VerticalStackLayout></Border>
                         <Border Grid.Row="1" Grid.Column="2" Style="{StaticResource Card}" Padding="10"><VerticalStackLayout><Label Text="{Binding FriendCode}" FontSize="16" FontAttributes="Bold" HorizontalOptions="Center" /><Label Text="Friend code" Style="{StaticResource Caption}" HorizontalOptions="Center" /></VerticalStackLayout></Border>
                     </Grid>
+
+                    <Label Text="By mode" Style="{StaticResource Heading}" />
+                    <Border Style="{StaticResource Card}" Padding="10">
+                        <VerticalStackLayout Spacing="6">
+                            <Grid ColumnDefinitions="1.2*,*,*,*,1.6*" ColumnSpacing="6">
+                                <Label Text="Mode" Style="{StaticResource Caption}" FontAttributes="Bold" />
+                                <Label Grid.Column="1" Text="Played" Style="{StaticResource Caption}" FontAttributes="Bold" />
+                                <Label Grid.Column="2" Text="Won" Style="{StaticResource Caption}" FontAttributes="Bold" />
+                                <Label Grid.Column="3" Text="Win %" Style="{StaticResource Caption}" FontAttributes="Bold" />
+                                <Label Grid.Column="4" Text="Win streak" Style="{StaticResource Caption}" FontAttributes="Bold" />
+                            </Grid>
+                            <VerticalStackLayout BindableLayout.ItemsSource="{Binding ModeStats}" Spacing="6">
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:StatRow">
+                                        <Grid ColumnDefinitions="1.2*,*,*,*,1.6*" ColumnSpacing="6">
+                                            <Label Text="{Binding Label}" FontAttributes="Bold" />
+                                            <Label Grid.Column="1" Text="{Binding Played}" />
+                                            <Label Grid.Column="2" Text="{Binding Won}" />
+                                            <Label Grid.Column="3" Text="{Binding WinRate}" />
+                                            <Label Grid.Column="4" Text="{Binding Streak}" FontSize="13" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
+                            </VerticalStackLayout>
+                        </VerticalStackLayout>
+                    </Border>
 
                     <Label Text="Account" Style="{StaticResource Heading}" />
                     <Border Style="{StaticResource Card}">

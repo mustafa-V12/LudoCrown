@@ -14,6 +14,8 @@
                 <Border Style="{StaticResource Card}" IsVisible="{Binding HasRewards}" HorizontalOptions="Center" Padding="20,10">
                     <Label Text="{Binding RewardsText}" FontAttributes="Bold" TextColor="{StaticResource Gold}" FontSize="18" />
                 </Border>
+                <Label Text="{Binding LeagueText}" IsVisible="{Binding HasLeague}" FontAttributes="Bold" HorizontalOptions="Center" />
+                <Label Text="{Binding ModeText}" Style="{StaticResource Caption}" HorizontalOptions="Center" HorizontalTextAlignment="Center" />
                 <VerticalStackLayout BindableLayout.ItemsSource="{Binding Rows}" Spacing="10" Margin="0,8">
                     <BindableLayout.ItemTemplate>
                         <DataTemplate x:DataType="vm:ResultRow">

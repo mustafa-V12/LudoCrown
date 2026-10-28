@@ -9,6 +9,7 @@
         <VerticalStackLayout Grid.Row="1" Spacing="18" HorizontalOptions="Center">
             <Image x:Name="Crown" Source="crown_logo.png" WidthRequest="130" HeightRequest="98" SemanticProperties.Description="Searching" />
             <Label Text="{Binding Title}" Style="{StaticResource Title}" HorizontalOptions="Center" />
+            <Label Text="{Binding RulesText}" Style="{StaticResource Caption}" HorizontalTextAlignment="Center" />
             <Label Text="{Binding Status}" Style="{StaticResource Caption}" FontSize="17" HorizontalOptions="Center" />
             <Label Text="{Binding PlayersText}" IsVisible="{Binding Searching}" FontAttributes="Bold" TextColor="{StaticResource Gold}" HorizontalOptions="Center" />
             <ActivityIndicator IsRunning="{Binding Searching}" IsVisible="{Binding Searching}" />

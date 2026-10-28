@@ -1,4 +1,5 @@
 using LudoCrown.App.Game;
+using LudoCrown.Core.Model;
 using LudoCrown.Core.Protocol;
 
 namespace LudoCrown.App.ViewModels;
@@ -17,6 +18,12 @@ public sealed class AppState
     public IReadOnlyList<OfflineSeat>? LastOfflineSeats { get; set; }
 
     public int RequestedPlayerCount { get; set; } = 2;
+    /// <summary>Game mode chosen on the home / offline screens. Fixed for the whole match once it starts.</summary>
+    public GameMode SelectedMode { get; set; } = GameMode.Classic;
+    /// <summary>Ranked (league points, no boosts) or casual (boosts allowed) matchmaking.</summary>
+    public MatchQueue SelectedQueue { get; set; } = MatchQueue.Ranked;
+    /// <summary>Public id (friend code) of the player whose profile screen is open.</summary>
+    public string? ViewedPlayerId { get; set; }
     public PrivateRoomMode PrivateRoomMode { get; set; }
     public string? PrivateRoomCode { get; set; }
     public RoomInfo? PendingRoom { get; set; }

@@ -49,10 +49,12 @@ public sealed class OfflineGameSession : IGameSession
         State = Build();
     }
 
-    public static OfflineGameSession NewGame(IReadOnlyList<OfflineSeat> seats, IDiceRoller dice, IDelay delay, ISettingsStore settings, Random? random = null)
+    /// <summary>New offline game in the chosen mode (Classic: all 4 pieces; Quick: first piece wins). Rerolls and boosts are online-only.</summary>
+    public static OfflineGameSession NewGame(IReadOnlyList<OfflineSeat> seats, IDiceRoller dice, IDelay delay, ISettingsStore settings, Random? random = null, GameMode mode = GameMode.Classic)
     {
         var state = GameSetup.NewGame("offline-" + Guid.NewGuid().ToString("N")[..8],
-            seats.Select((s, i) => new SeatSetup($"local-{i}", s.Name, s.IsBot ? PlayerKind.Bot : PlayerKind.Human)).ToList());
+            seats.Select((s, i) => new SeatSetup($"local-{i}", s.Name, s.IsBot ? PlayerKind.Bot : PlayerKind.Human)).ToList(),
+            RuleSet.ForMode(mode));
         return new OfflineGameSession(state, seats, dice, delay, settings, random);
     }
 
@@ -138,6 +140,13 @@ public sealed class OfflineGameSession : IGameSession
 
     public Task SendReactionAsync(string reactionId) => Task.CompletedTask;
 
+    // Gems and Shield bottles are server-owned, so offline games never spend them.
+    public Task RerollAsync() { Notice?.Invoke(RerollText.Reason(State)); return Task.CompletedTask; }
+    public Task PassAsync() => Task.CompletedTask;
+    public Task UseBoostAsync() { Notice?.Invoke(BoostText.Reason(State)); return Task.CompletedTask; }
+
+    public GameMode Mode => _state.Rules.Mode;
+
     public void DiscardSave() => _settings.SetString(SettingKeys.OfflineSave, null);
 
     public ValueTask DisposeAsync()
@@ -205,7 +214,7 @@ public sealed class OfflineGameSession : IGameSession
             var standings = _state.Standings();
             var humanSeats = Enumerable.Range(0, _seats.Count).Where(i => !_seats[i].IsBot).ToList();
             int? placement = humanSeats.Count == 1 ? standings.ToList().IndexOf(humanSeats[0]) + 1 : null;
-            Ended?.Invoke(new GameResult(standings, State.Seats, placement, 0, 0, false, null, false, "won"));
+            Ended?.Invoke(new GameResult(standings, State.Seats, placement, 0, 0, false, null, false, "won", _state.Rules.Mode));
         }
     }
 
@@ -240,6 +249,8 @@ public sealed class OfflineGameSession : IGameSession
             _state.WinnerSeat,
             humanTurn ? GameEngine.GetLegalMoves(_state).Select(m => m.Piece).ToList() : new List<int>(),
             null,
-            humanTurn && _state.Phase == GamePhase.AwaitingRoll);
+            humanTurn && _state.Phase == GamePhase.AwaitingRoll,
+            _state.Rules.Mode,
+            MatchKind.Offline);
     }
 }

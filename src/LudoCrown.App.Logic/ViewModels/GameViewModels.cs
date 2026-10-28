@@ -41,8 +41,54 @@ public sealed class GameViewModel : ViewModelBase
         _delay = delay;
         RollCommand = new AsyncCommand(RollAsync);
         LeaveCommand = new AsyncCommand(LeaveAsync);
-        ReactCommand = new AsyncCommand(p => _session?.SendReactionAsync(p as string ?? "") ?? Task.CompletedTask);
+        ReactCommand = new AsyncCommand(p => SendChatAsync(p as string ?? ""));
+        RerollCommand = new AsyncCommand(RerollAsync);
+        PassCommand = new AsyncCommand(() => _session?.PassAsync() ?? Task.CompletedTask);
+        BoostCommand = new AsyncCommand(BoostAsync);
+        ToggleChatCommand = new AsyncCommand(() => { IsChatOpen = !IsChatOpen; return Task.CompletedTask; });
+        ToggleMuteCommand = new AsyncCommand(p => { ToggleMute(Convert.ToInt32(p)); return Task.CompletedTask; });
+        OpenPlayerCommand = new AsyncCommand(p => OpenPlayerAsync(Convert.ToInt32(p)));
+        RulesInfoCommand = new AsyncCommand(ShowRulesAsync);
     }
+
+    private bool _chatOpen;
+    private readonly HashSet<int> _muted = new();
+
+    public ICommand RerollCommand { get; }
+    public ICommand PassCommand { get; }
+    public ICommand BoostCommand { get; }
+    public ICommand ToggleChatCommand { get; }
+    public ICommand ToggleMuteCommand { get; }
+    public ICommand OpenPlayerCommand { get; }
+    public ICommand RulesInfoCommand { get; }
+
+    // ----- mode & match labels (shown in the match UI) -----
+    public string ModeText => Board is null ? "" : $"{Board.ModeInfo.Name} · {Board.ModeInfo.WinCondition}";
+    public string ModeChip => Board is null ? "" : $"{Board.ModeInfo.Name} · {MatchLabels.Kind(Board.Kind)}";
+
+    // ----- gem rerolls -----
+    public bool ShowRerollBar => Board is { Kind: not MatchKind.Offline } && Board.MaxRerolls > 0;
+    public bool CanReroll => Board?.RerollStatus == RerollStatus.Available;
+    public bool CanPass => Board?.CanPass ?? false;
+    public string GemsText => Board?.Gems is int g ? $"{g:N0}" : "—";
+    public string RerollButtonText => Board is null ? "" : $"Reroll · {GameModes.RerollGemCost} gem";
+    public string RerollCountText => Board is null ? "" : $"Rerolls {Board.RerollsUsed}/{Board.MaxRerolls}";
+    public string RerollHint => Board is null ? "" : RerollText.Reason(Board);
+    public bool ShowOfflineNote => Board is { Kind: MatchKind.Offline };
+    public string OfflineNote => "Offline game: gem rerolls and boosts are only available online, because gems are kept safely on the server.";
+
+    // ----- Shield boost -----
+    public bool ShowBoost => Board is { MaxBoosts: > 0 };
+    public bool CanBoost => Board?.BoostStatus == BoostStatus.Available;
+    public string BoostButtonText => Board?.ShieldBottles is int n ? $"🛡 Shield ({n})" : "🛡 Shield";
+    public string BoostHint => Board is null ? "" : BoostText.Reason(Board);
+    public bool BoostsOffNotice => Board is { Kind: MatchKind.Ranked };
+
+    // ----- quick chat -----
+    public bool IsChatOpen { get => _chatOpen; private set => Set(ref _chatOpen, value); }
+    public IReadOnlyList<QuickChatItem> ChatPhrases => Reactions.Items.Where(i => i.Kind == QuickChatKind.Phrase).ToList();
+    public IReadOnlyList<QuickChatItem> ChatEmoji => Reactions.Items.Where(i => i.Kind == QuickChatKind.Emoji).ToList();
+    public bool IsMuted(int seat) => _muted.Contains(seat);
 
     /// <summary>Raised with (previous, next) so the board view can animate moves.</summary>
     public event Action<BoardState?, BoardState>? BoardChanged;
@@ -57,6 +103,7 @@ public sealed class GameViewModel : ViewModelBase
     public int DiceValue => Board?.PendingRoll ?? Board?.LastRoll ?? 1;
     public bool ShowReactions => IsOnline && _settings.GetBool(SettingKeys.ShowReactions, true);
     public IReadOnlyList<string> ReactionIds => Reactions.All;
+    public event Action? MuteChanged;
     public ObservableCollection<SeatView> Seats { get; } = new();
     public ICommand RollCommand { get; }
     public ICommand LeaveCommand { get; }
@@ -77,6 +124,7 @@ public sealed class GameViewModel : ViewModelBase
         _session.Reaction += OnReaction;
         OnPropertyChanged(nameof(IsOnline));
         OnPropertyChanged(nameof(ShowReactions));
+        _muted.Clear();
         Apply(_session.State);
         await _session.StartAsync();
     }
@@ -136,10 +184,65 @@ public sealed class GameViewModel : ViewModelBase
 
     private void RefreshDerived()
     {
-        OnPropertyChanged(nameof(CanRoll));
-        OnPropertyChanged(nameof(DiceValue));
+        foreach (var p in new[] { nameof(CanRoll), nameof(DiceValue), nameof(ModeText), nameof(ModeChip), nameof(ShowRerollBar), nameof(CanReroll), nameof(CanPass), nameof(GemsText),
+                     nameof(RerollButtonText), nameof(RerollCountText), nameof(RerollHint), nameof(ShowOfflineNote), nameof(ShowBoost), nameof(CanBoost), nameof(BoostButtonText),
+                     nameof(BoostHint), nameof(BoostsOffNotice) })
+            OnPropertyChanged(p);
         Status = StatusFor(Board);
     }
+
+    private async Task RerollAsync()
+    {
+        if (_session is null || Board is null) return;
+        if (!CanReroll) { OnNotice(RerollHint); return; }
+        if (_settings.GetBool(SettingKeys.ConfirmGemSpend, true))
+        {
+            var ok = await _dialogs.ConfirmAsync("Reroll the die?",
+                $"Spend {GameModes.RerollGemCost} gem to replace your {Board.PendingRoll} with a new roll from the server.\n\nYou have {GemsText} gems · {Board.RerollsLeft} of {Board.MaxRerolls} rerolls left this match.",
+                $"Reroll ({GameModes.RerollGemCost} gem)", "Keep my roll");
+            if (!ok) return;
+        }
+        _feedback.Play(SoundEffect.DiceRoll);
+        await _session.RerollAsync();
+    }
+
+    private async Task BoostAsync()
+    {
+        if (_session is null || Board is null) return;
+        if (!CanBoost) { OnNotice(BoostHint); return; }
+        var ok = await _dialogs.ConfirmAsync("Drink a Shield?", $"{Boosts.ShieldEffect}\n\n{Boosts.ShieldLimits}\nYou have {Board.ShieldBottles} bottles.", "Use Shield", "Not now");
+        if (!ok) return;
+        await _session.UseBoostAsync();
+    }
+
+    private Task SendChatAsync(string id)
+    {
+        if (_session is null || !Reactions.IsValid(id)) return Task.CompletedTask;
+        IsChatOpen = false;
+        return _session.SendReactionAsync(id);
+    }
+
+    private void ToggleMute(int seat)
+    {
+        if (!_muted.Remove(seat)) _muted.Add(seat);
+        MuteChanged?.Invoke();
+    }
+
+    private async Task OpenPlayerAsync(int seat)
+    {
+        if (Board is null || seat < 0 || seat >= Board.Seats.Count) return;
+        var s = Board.Seats[seat];
+        if (s.PublicId is null) { OnNotice(s.IsBot ? $"{s.Name} is a computer player." : $"{s.Name} has no public profile."); return; }
+        var options = new List<string> { "View profile" };
+        if (!s.IsLocalHuman) options.Add(IsMuted(seat) ? "Unmute chat" : "Mute chat");
+        var choice = await _dialogs.ActionSheetAsync(s.Name, "Cancel", options.ToArray());
+        if (choice == "View profile") { _state.ViewedPlayerId = s.PublicId; await _nav.GoToAsync(Routes.PlayerProfile); }
+        else if (choice is "Mute chat" or "Unmute chat") ToggleMute(seat);
+    }
+
+    private Task ShowRulesAsync() => Board is null ? Task.CompletedTask
+        : _dialogs.AlertAsync($"{Board.ModeInfo.Name} rules", $"{Board.ModeInfo.WinCondition}\n\n{Board.ModeInfo.Description}" +
+            (Board.Kind == MatchKind.Offline ? "" : $"\n\n{MatchLabels.Kind(Board.Kind)} match." + (Board.MaxBoosts > 0 ? $" Shield: {Boosts.ShieldLimits}" : " Boosts are off.")));
 
     public static string StatusFor(BoardState? b)
     {
@@ -149,6 +252,7 @@ public sealed class GameViewModel : ViewModelBase
         if (seat.IsLocalHuman)
         {
             var who = b.Seats.Count(s => s.IsLocalHuman) > 1 ? $"{seat.Name}, " : "";
+            if (b.CanPass) return $"{who}no move with {b.PendingRoll} — reroll or pass";
             return b.Phase == GamePhase.AwaitingRoll ? $"{who}your turn — roll the die" : $"{who}tap a glowing piece to move {b.PendingRoll}";
         }
         if (!seat.IsConnected) return $"{seat.Name} is reconnecting…";
@@ -183,7 +287,7 @@ public sealed class GameViewModel : ViewModelBase
 
     private void OnReaction(ReactionInfo r) => _main.Post(() =>
     {
-        if (Board is null || r.Seat < 0 || r.Seat >= Board.Seats.Count || !ShowReactions) return;
+        if (Board is null || r.Seat < 0 || r.Seat >= Board.Seats.Count || !ShowReactions || _muted.Contains(r.Seat)) return;
         ReactionReceived?.Invoke(r, Board.Seats[r.Seat]);
     });
 
@@ -230,6 +334,9 @@ public sealed class ResultsViewModel : ViewModelBase
     public string RewardsText { get; private set; } = "";
     public bool HasRewards { get; private set; }
     public bool Won { get; private set; }
+    public string ModeText { get; private set; } = "";
+    public string LeagueText { get; private set; } = "";
+    public bool HasLeague { get; private set; }
     public string PlayAgainText { get; private set; } = "Play again";
     public ICommand PlayAgainCommand { get; }
     public ICommand HomeCommand { get; }
@@ -251,11 +358,20 @@ public sealed class ResultsViewModel : ViewModelBase
         Title = _result.Reason == "abandoned" ? "Match ended"
             : _result.YourPlacement is int p ? (p == 1 ? "You won the crown!" : $"You finished {Rows[p - 1].PlacementText}")
             : $"{winner.Name} wins!";
-        Subtitle = _result.IsOnline ? (_result.IsPrivate ? "Private table" : "Online match") : "Offline game";
-        HasRewards = _result.CoinsAwarded > 0 || _result.XpAwarded > 0;
-        RewardsText = HasRewards ? $"+{_result.CoinsAwarded} coins   +{_result.XpAwarded} XP" : "";
+        var info = GameModes.Get(_result.Mode);
+        Subtitle = _result.IsOnline ? $"{MatchLabels.Kind(_result.Kind)} · {info.Name}" : $"Offline game · {info.Name}";
+        ModeText = $"{info.Name}: {info.WinCondition}";
+        HasRewards = _result.CoinsAwarded > 0 || _result.XpAwarded > 0 || _result.GemsAwarded > 0;
+        RewardsText = HasRewards ? string.Join("   ", new[]
+        {
+            _result.CoinsAwarded > 0 ? $"+{_result.CoinsAwarded} gold" : null,
+            _result.GemsAwarded > 0 ? $"+{_result.GemsAwarded} gem" : null,
+            _result.XpAwarded > 0 ? $"+{_result.XpAwarded} XP" : null,
+        }.Where(x => x is not null)) : "";
+        HasLeague = _result.LeaguePoints is not null;
+        LeagueText = _result.LeaguePoints is int lp ? $"League: {(lp >= 0 ? "+" : "")}{lp} points" : "";
         PlayAgainText = _result.IsOnline ? (_result.IsPrivate ? "Rematch" : "Find another match") : "Play again";
-        foreach (var n in new[] { nameof(Title), nameof(Subtitle), nameof(HasRewards), nameof(RewardsText), nameof(Won), nameof(PlayAgainText) }) OnPropertyChanged(n);
+        foreach (var n in new[] { nameof(Title), nameof(Subtitle), nameof(HasRewards), nameof(RewardsText), nameof(Won), nameof(PlayAgainText), nameof(ModeText), nameof(LeagueText), nameof(HasLeague) }) OnPropertyChanged(n);
     }
 
     private Task PlayAgainAsync() => RunBusyAsync(async () =>
@@ -265,7 +381,7 @@ public sealed class ResultsViewModel : ViewModelBase
         {
             var seats = _state.LastOfflineSeats;
             if (seats is null) { await _nav.ReplaceAsync(Routes.OfflineSetup); return; }
-            _state.CurrentSession = OfflineGameSession.NewGame(seats, new CryptoDiceRoller(), _delay, _settings);
+            _state.CurrentSession = OfflineGameSession.NewGame(seats, new CryptoDiceRoller(), _delay, _settings, mode: _result.Mode);
             await _nav.ReplaceAsync(Routes.Game);
         }
         else if (_result.IsPrivate && _result.MatchId is not null)
@@ -279,6 +395,8 @@ public sealed class ResultsViewModel : ViewModelBase
         else
         {
             _state.RequestedPlayerCount = _result.Seats.Count;
+            _state.SelectedMode = _result.Mode;
+            _state.SelectedQueue = _result.Kind == MatchKind.Casual ? MatchQueue.Casual : MatchQueue.Ranked;
             await _nav.ReplaceAsync(Routes.Matchmaking);
         }
     });

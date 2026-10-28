@@ -19,5 +19,8 @@ public partial class AppShell : Shell
         Routing.RegisterRoute(Routes.EmailSignIn, typeof(EmailSignInPage));
         Routing.RegisterRoute(Routes.Rules, typeof(RulesPage));
         Routing.RegisterRoute(Routes.BlockedPlayers, typeof(BlockedPlayersPage));
+        Routing.RegisterRoute(Routes.Store, typeof(StorePage));
+        Routing.RegisterRoute(Routes.League, typeof(LeaguePage));
+        Routing.RegisterRoute(Routes.PlayerProfile, typeof(PlayerProfilePage));
     }
 }

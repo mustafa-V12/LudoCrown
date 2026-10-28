@@ -20,6 +20,12 @@
                     </VerticalStackLayout>
                 </Border>
 
+                <Border Style="{StaticResource Card}" Padding="14,10">
+                    <VerticalStackLayout Spacing="2">
+                        <Label Text="{Binding ModeText}" FontAttributes="Bold" />
+                        <Label Text="{Binding ModeDetail}" Style="{StaticResource Caption}" />
+                    </VerticalStackLayout>
+                </Border>
                 <Label Text="{Binding SeatsText}" Style="{StaticResource Heading}" />
                 <CollectionView ItemsSource="{Binding Seats}" SelectionMode="None">
                     <CollectionView.ItemTemplate>

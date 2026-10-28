@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using LudoCrown.App.Auth;
 using LudoCrown.App.Services;
+using LudoCrown.Core.Model;
 using LudoCrown.Core.Protocol;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
@@ -113,14 +114,18 @@ public sealed class SignalRMatchConnection : IMatchConnection
 
     private HubConnection Hub => _hub ?? throw new InvalidOperationException("Not connected.");
 
-    public Task<MatchmakingStatus> FindMatchAsync(int playerCount) => Hub.InvokeAsync<MatchmakingStatus>(HubNames.FindMatch, playerCount);
+    public Task<MatchmakingStatus> FindMatchAsync(int playerCount, GameMode mode, MatchQueue queue) =>
+        Hub.InvokeAsync<MatchmakingStatus>(HubNames.FindMatch, playerCount, GameModes.Get(mode).Id, queue == MatchQueue.Casual ? "casual" : "ranked");
     public Task CancelMatchmakingAsync() => _hub is null ? Task.CompletedTask : _hub.InvokeAsync(HubNames.CancelMatchmaking);
-    public Task<HubResult<RoomInfo>> CreatePrivateRoomAsync(int playerCount) => Hub.InvokeAsync<HubResult<RoomInfo>>(HubNames.CreatePrivateRoom, playerCount);
+    public Task<HubResult<RoomInfo>> CreatePrivateRoomAsync(int playerCount, GameMode mode) => Hub.InvokeAsync<HubResult<RoomInfo>>(HubNames.CreatePrivateRoom, playerCount, GameModes.Get(mode).Id);
     public Task<HubResult<RoomInfo>> JoinPrivateRoomAsync(string code) => Hub.InvokeAsync<HubResult<RoomInfo>>(HubNames.JoinPrivateRoom, code);
     public Task<HubResult<string>> StartPrivateRoomAsync(string roomId) => Hub.InvokeAsync<HubResult<string>>(HubNames.StartPrivateRoom, roomId);
     public Task<ServerError?> LeaveRoomAsync(string id) => _hub is null ? Task.FromResult<ServerError?>(null) : _hub.InvokeAsync<ServerError?>(HubNames.LeaveRoom, id);
     public Task<ServerError?> RollAsync(string matchId, long expectedVersion) => Hub.InvokeAsync<ServerError?>(HubNames.Roll, matchId, expectedVersion);
     public Task<ServerError?> MoveAsync(string matchId, int pieceIndex, long expectedVersion) => Hub.InvokeAsync<ServerError?>(HubNames.Move, matchId, pieceIndex, expectedVersion);
+    public Task<RerollResult> RerollAsync(string matchId, long expectedVersion, string requestId) => Hub.InvokeAsync<RerollResult>(HubNames.Reroll, matchId, expectedVersion, requestId);
+    public Task<ServerError?> PassTurnAsync(string matchId, long expectedVersion) => Hub.InvokeAsync<ServerError?>(HubNames.PassTurn, matchId, expectedVersion);
+    public Task<BoostResult> UseBoostAsync(string matchId, long expectedVersion, string requestId) => Hub.InvokeAsync<BoostResult>(HubNames.UseBoost, matchId, expectedVersion, requestId);
     public Task<MatchSnapshot?> ResyncAsync(string? matchId) => Hub.InvokeAsync<MatchSnapshot?>(HubNames.Resync, matchId);
     public Task<ServerError?> SendReactionAsync(string matchId, string reactionId) => Hub.InvokeAsync<ServerError?>(HubNames.SendReaction, matchId, reactionId);
     public Task<HubResult<RoomInfo>> RequestRematchAsync(string matchId) => Hub.InvokeAsync<HubResult<RoomInfo>>(HubNames.RequestRematch, matchId);

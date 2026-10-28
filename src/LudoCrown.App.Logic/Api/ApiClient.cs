@@ -10,14 +10,48 @@ namespace LudoCrown.App.Api;
 public sealed record TokenResponse(string AccessToken, DateTimeOffset AccessTokenExpiresAt, string RefreshToken, Guid UserId, bool IsGuest);
 public sealed record ProvidersResponse(bool Guest, bool Apple, bool Google, bool Facebook, bool Email);
 public sealed record StatsDto(int GamesPlayed, int GamesWon, int TwoPlayerWins, int FourPlayerWins, int PiecesCaptured, int Abandons, int CurrentWinStreak, int BestWinStreak);
-public sealed record MeResponse(Guid UserId, bool IsGuest, string DisplayName, string AvatarId, string FriendCode, int Level, int Xp, int XpForNextLevel, long Coins, StatsDto Stats, IReadOnlyList<string> LinkedProviders);
-public sealed record MatchHistoryDto(Guid MatchId, string Mode, int PlayerCount, DateTimeOffset StartedAt, DateTimeOffset? EndedAt, int Placement, string Result, int CoinsAwarded, int XpAwarded, IReadOnlyList<string> Opponents);
-public sealed record FriendDto(Guid UserId, string DisplayName, string AvatarId, int Level, string Status, bool IncomingRequest);
+public sealed record MeResponse(Guid UserId, bool IsGuest, string DisplayName, string AvatarId, string FriendCode, int Level, int Xp, int XpForNextLevel, long Coins, StatsDto Stats, IReadOnlyList<string> LinkedProviders, long Gems = 0);
+public sealed record MatchHistoryDto(Guid MatchId, string Mode, int PlayerCount, DateTimeOffset StartedAt, DateTimeOffset? EndedAt, int Placement, string Result, int CoinsAwarded, int XpAwarded, IReadOnlyList<string> Opponents,
+    string? GameMode = null, int RerollsUsed = 0, int GemsAwarded = 0, int? LeaguePoints = null);
+public sealed record FriendDto(Guid UserId, string DisplayName, string AvatarId, int Level, string Status, bool IncomingRequest, string FriendCode = "");
 public sealed record FriendRequestResponse(string Status, string DisplayName);
 public sealed record BlockedDto(Guid UserId, string DisplayName);
 public sealed record DeleteAccountResponse(bool Deleted, bool AppleTokenRevoked, string? Note);
-public sealed record ApiErrorBody(string Code, string Message);
+/// <summary>Error body. Most endpoints send Code; store endpoints send Status (e.g. "rejected", "not_enough_coins").</summary>
+public sealed record ApiErrorBody(string? Code, string? Message, string? Status = null);
 public sealed record LinkTicketResponse(string Ticket);
+
+// ---- store, inventory, profiles, league (src/LudoCrown.Server/Endpoints/StoreEndpoints.cs, LeagueEndpoints.cs) ----
+public sealed record ContentDto(string Asset, long Amount, string Label);
+public sealed record ProductDto(string Id, string Kind, string Title, string Description, IReadOnlyList<ContentDto> Contents, int? CoinPrice, string? AppStoreProductId, bool Owned);
+public sealed record CatalogResponse(IReadOnlyList<ProductDto> Products, IReadOnlyList<string> Stores, bool AppStoreConfigured, bool DevSandbox, bool PlaceholderProductIds, string Environment);
+public sealed record InventoryItemDto(string Id, string Name, string Description, string Kind, int Quantity);
+public sealed record BalancesDto(long Coins, long Gems, IReadOnlyList<InventoryItemDto> Items)
+{
+    public int Count(string itemId) => Items.FirstOrDefault(i => i.Id == itemId)?.Quantity ?? 0;
+}
+public sealed record PurchaseResponse(string Status, string Message, BalancesDto? Balances, IReadOnlyList<ContentDto> Granted);
+public sealed record BuyResponse(string Status, string Message, BalancesDto? Balances);
+public sealed record InventoryResponse(BalancesDto Balances, string? EquippedFrame);
+public sealed record PurchaseTokenResponse(Guid AppAccountToken);
+
+public sealed record ModeStatsDto(string Mode, string ModeName, int GamesPlayed, int GamesWon, int GamesLost, int Abandons, int WinRatePercent, int CurrentWinStreak, int BestWinStreak);
+public sealed record PublicLeagueDto(int Season, int Division, string DivisionName, int Points, int? GroupRank);
+public sealed record PublicProfileDto(string PublicId, string DisplayName, string AvatarId, string? FrameId, int Level, bool IsYou, bool IsFriend,
+    bool StatsVisible, ModeStatsDto? Overall, IReadOnlyList<ModeStatsDto> Modes, bool LeagueVisible, PublicLeagueDto? League);
+public sealed record PrivacyDto(bool ShowStats, bool ShowLeague, bool ChatEnabled);
+
+public sealed record DivisionDto(int Index, string Name, string Crest);
+public sealed record SeasonDto(int Number, DateTimeOffset StartsAt, DateTimeOffset EndsAt, long SecondsRemaining, string Status);
+public sealed record MyStandingDto(bool Joined, int Division, string DivisionName, int Points, int? GroupRank, int GroupSize, int MatchesPlayed, int Wins,
+    bool InPromotionZone, bool InDemotionZone, int MatchesNeededForPromotion);
+public sealed record GroupRowDto(int Rank, string PublicId, string DisplayName, string AvatarId, string? FrameId, int Points, int MatchesPlayed, int Wins, bool IsYou);
+public sealed record RewardCellDto(int Coins, int Gems, int Shields);
+public sealed record RewardRowDto(int Division, string DivisionName, IReadOnlyList<RewardCellDto> Bands);
+public sealed record RewardTableDto(IReadOnlyList<string> Bands, IReadOnlyList<RewardRowDto> Rows, IReadOnlyList<string> Rules);
+public sealed record LastSeasonDto(int Number, int? FinalRank, string? Outcome, RewardCellDto? Reward, bool RewardGranted);
+public sealed record LeagueResponse(bool Enabled, string Environment, SeasonDto? Season, IReadOnlyList<DivisionDto> Divisions, MyStandingDto? Me,
+    IReadOnlyList<GroupRowDto> Group, RewardTableDto Rewards, LastSeasonDto? LastSeason);
 
 public enum ApiErrorKind { None, Network, Unauthorized, NotFound, Conflict, RateLimited, Invalid, Server, NotConfigured }
 
@@ -82,7 +116,7 @@ public sealed class ApiClient(HttpClient http)
     {
         if (response.IsSuccessStatusCode)
         {
-            if (response.StatusCode is HttpStatusCode.NoContent or HttpStatusCode.Accepted || response.Content.Headers.ContentLength == 0)
+            if (response.StatusCode is HttpStatusCode.NoContent || response.Content.Headers.ContentLength == 0)
                 return ApiResult<T>.Success(default);
             var text = await response.Content.ReadAsStringAsync();
             return ApiResult<T>.Success(string.IsNullOrWhiteSpace(text) ? default : JsonSerializer.Deserialize<T>(text, Json));
@@ -96,7 +130,8 @@ public sealed class ApiClient(HttpClient http)
             HttpStatusCode.NotFound => error?.Code == "provider_disabled" ? ApiErrorKind.NotConfigured : ApiErrorKind.NotFound,
             HttpStatusCode.Conflict => ApiErrorKind.Conflict,
             HttpStatusCode.TooManyRequests => ApiErrorKind.RateLimited,
-            HttpStatusCode.BadRequest => ApiErrorKind.Invalid,
+            HttpStatusCode.BadRequest or HttpStatusCode.UnprocessableEntity => ApiErrorKind.Invalid,
+            HttpStatusCode.Forbidden => ApiErrorKind.Invalid,
             _ => ApiErrorKind.Server,
         };
         var message = error?.Message ?? kind switch
@@ -106,6 +141,6 @@ public sealed class ApiClient(HttpClient http)
             ApiErrorKind.NotFound => "Not found.",
             _ => "Something went wrong on the server. Please try again.",
         };
-        return new ApiResult<T>(default, kind, message, error?.Code);
+        return new ApiResult<T>(default, kind, message, error?.Code ?? error?.Status);
     }
 }

@@ -10,7 +10,7 @@
         <VerticalStackLayout Padding="20,12,20,28" Spacing="16" MaximumWidthRequest="520">
 
             <!-- Profile bar -->
-            <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="8">
                 <controls:AvatarView AvatarId="{Binding AvatarId}" Size="52" VerticalOptions="Center">
                     <controls:AvatarView.GestureRecognizers>
                         <TapGestureRecognizer Command="{Binding ProfileCommand}" />
@@ -26,9 +26,24 @@
                         <Label Text="{Binding CoinsText}" FontAttributes="Bold" VerticalOptions="Center" SemanticProperties.Description="Coins" />
                     </HorizontalStackLayout>
                 </Border>
-                <Button Grid.Column="3" Text="⚙" FontSize="22" Command="{Binding SettingsCommand}" Style="{StaticResource LinkButton}"
+                <Border Grid.Column="3" IsVisible="{Binding IsSignedIn}" Style="{StaticResource Card}" Padding="12,6" StrokeShape="RoundRectangle 16" VerticalOptions="Center">
+                    <Border.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding StoreCommand}" />
+                    </Border.GestureRecognizers>
+                    <HorizontalStackLayout Spacing="6">
+                        <Label Text="💎" FontSize="15" VerticalOptions="Center" />
+                        <Label Text="{Binding GemsText}" FontAttributes="Bold" VerticalOptions="Center" SemanticProperties.Description="Gems" />
+                    </HorizontalStackLayout>
+                </Border>
+                <Button Grid.Column="4" Text="⚙" FontSize="22" Command="{Binding SettingsCommand}" Style="{StaticResource LinkButton}"
                         WidthRequest="48" SemanticProperties.Description="Settings" />
             </Grid>
+
+            <!-- Which backend is in use: offline, local development server, or live. -->
+            <Border Padding="12,6" StrokeShape="RoundRectangle 12" StrokeThickness="1" HorizontalOptions="Center"
+                    Stroke="{StaticResource PlumLight}" Background="{StaticResource Plum}">
+                <Label Text="{Binding EnvironmentText}" FontSize="12" TextColor="{StaticResource Muted}" HorizontalTextAlignment="Center" />
+            </Border>
 
             <Border Style="{StaticResource Card}" IsVisible="{Binding IsGuest}" Padding="14,10">
                 <Grid ColumnDefinitions="*,Auto">
@@ -43,11 +58,27 @@
                 <Label Text="Ludo Crown" Style="{StaticResource Title}" HorizontalOptions="Center" />
             </VerticalStackLayout>
 
+            <!-- Game mode: chosen before the match, fixed once it starts -->
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="Game mode" Style="{StaticResource Heading}" />
+                    <controls:ModeSelector Picker="{Binding Modes}" />
+                    <Label Text="{Binding Modes.SelectedSummary}" FontAttributes="Bold" />
+                    <Label Text="{Binding Modes.SelectedDescription}" Style="{StaticResource Caption}" />
+                </VerticalStackLayout>
+            </Border>
+
             <!-- Online play -->
             <Border Style="{StaticResource Card}">
                 <VerticalStackLayout Spacing="12">
                     <Label Text="Play online" Style="{StaticResource Heading}" />
-                    <Label Text="Get matched with players around the world." Style="{StaticResource Caption}" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                        <Button Text="Ranked" Command="{Binding SelectQueueCommand}" CommandParameter="ranked" Style="{StaticResource SecondaryButton}"
+                                BorderColor="{Binding IsRanked, Converter={StaticResource EqualsToColor}, ConverterParameter=True}" BorderWidth="2.5" />
+                        <Button Grid.Column="1" Text="Casual" Command="{Binding SelectQueueCommand}" CommandParameter="casual" Style="{StaticResource SecondaryButton}"
+                                BorderColor="{Binding IsCasual, Converter={StaticResource EqualsToColor}, ConverterParameter=True}" BorderWidth="2.5" />
+                    </Grid>
+                    <Label Text="{Binding QueueDescription}" Style="{StaticResource Caption}" />
                     <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
                         <Button Text="2 players" Command="{Binding PlayOnlineCommand}" CommandParameter="2" />
                         <Button Grid.Column="1" Text="4 players" Command="{Binding PlayOnlineCommand}" CommandParameter="4" />
@@ -76,6 +107,11 @@
                     <Button Text="Play vs computer" Command="{Binding PlayOfflineCommand}" Style="{StaticResource SecondaryButton}" />
                 </VerticalStackLayout>
             </Border>
+
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                <Button Text="🏆 League" Command="{Binding LeagueCommand}" Style="{StaticResource SecondaryButton}" />
+                <Button Grid.Column="1" Text="🛒 Store" Command="{Binding StoreCommand}" Style="{StaticResource SecondaryButton}" />
+            </Grid>
 
             <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
                 <Button Text="Profile" Command="{Binding ProfileCommand}" Style="{StaticResource LinkButton}" />

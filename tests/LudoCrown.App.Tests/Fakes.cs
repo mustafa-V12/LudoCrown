@@ -122,9 +122,26 @@ public sealed class FakeConnection : IMatchConnection
         return Task.CompletedTask;
     }
     public Task DisconnectAsync() { Status = ConnectionStatus.Disconnected; return Task.CompletedTask; }
-    public Task<MatchmakingStatus> FindMatchAsync(int playerCount) { Calls.Add($"find:{playerCount}"); return Task.FromResult(FindResult); }
+    public Task<MatchmakingStatus> FindMatchAsync(int playerCount, Core.Model.GameMode mode, MatchQueue queue) { Calls.Add($"find:{playerCount}:{mode}:{queue}"); return Task.FromResult(FindResult); }
     public Task CancelMatchmakingAsync() { Calls.Add("cancel"); return Task.CompletedTask; }
-    public Task<HubResult<RoomInfo>> CreatePrivateRoomAsync(int playerCount) { Calls.Add($"create:{playerCount}"); return Task.FromResult(new HubResult<RoomInfo>(Room(true), null)); }
+    public Task<HubResult<RoomInfo>> CreatePrivateRoomAsync(int playerCount, Core.Model.GameMode mode) { Calls.Add($"create:{playerCount}:{mode}"); return Task.FromResult(new HubResult<RoomInfo>(Room(true) with { Mode = mode }, null)); }
+    public RerollResult RerollAnswer { get; set; } = new(null, 9, 1, 6, 4);
+    public BoostResult BoostAnswer { get; set; } = new(null, 2, 1, 0);
+    /// <summary>When set, the next paid call throws (simulates a dropped connection with an unknown outcome).</summary>
+    public bool ThrowNextPaidCall { get; set; }
+    public Task<RerollResult> RerollAsync(string matchId, long expectedVersion, string requestId)
+    {
+        Calls.Add($"reroll:{expectedVersion}:{requestId}");
+        if (ThrowNextPaidCall) { ThrowNextPaidCall = false; throw new HttpRequestException("dropped"); }
+        return Task.FromResult(RerollAnswer);
+    }
+    public Task<ServerError?> PassTurnAsync(string matchId, long expectedVersion) { Calls.Add($"pass:{expectedVersion}"); return Task.FromResult(NextError); }
+    public Task<BoostResult> UseBoostAsync(string matchId, long expectedVersion, string requestId)
+    {
+        Calls.Add($"boost:{expectedVersion}:{requestId}");
+        if (ThrowNextPaidCall) { ThrowNextPaidCall = false; throw new HttpRequestException("dropped"); }
+        return Task.FromResult(BoostAnswer);
+    }
     public Task<HubResult<RoomInfo>> JoinPrivateRoomAsync(string code) { Calls.Add($"join:{code}"); return Task.FromResult(new HubResult<RoomInfo>(code == "ABCDEF" ? Room(false) : null, code == "ABCDEF" ? null : new ServerError(Core.Engine.ErrorCode.RoomNotFound, "No open table with that code."))); }
     public Task<HubResult<string>> StartPrivateRoomAsync(string roomId) { Calls.Add("start"); return Task.FromResult(new HubResult<string>("m1", null)); }
     public Task<ServerError?> LeaveRoomAsync(string id) { Calls.Add($"leave:{id}"); return Task.FromResult<ServerError?>(null); }
@@ -149,4 +166,25 @@ public sealed class FakeConnection : IMatchConnection
         "m1", version, phase, currentSeat, pendingRoll, pendingRoll, new[] { new[] { -1, -1, -1, -1 }, new[] { -1, -1, -1, -1 } },
         new[] { new SeatInfo(0, Core.Model.PlayerColor.Ruby, "Me", "crown", false, true), new SeatInfo(1, Core.Model.PlayerColor.Topaz, "Them", "lion", false, true) },
         Array.Empty<Core.Engine.GameEvent>(), null, yourSeat, DateTimeOffset.UtcNow.AddSeconds(20), legal ?? Array.Empty<int>());
+}
+
+/// <summary>Stands in for StoreKit.</summary>
+public sealed class FakeIap : IInAppPurchaseService
+{
+    public bool IsSupported { get; set; } = true;
+    public Dictionary<string, string> Prices { get; } = new();
+    public StorePurchaseOutcome NextOutcome { get; set; } = new(StorePurchaseStatus.Purchased, "2000000001");
+    public List<UnfinishedTransaction> Unfinished { get; } = new();
+    public List<string> Finished { get; } = new();
+    public List<(string Product, Guid Token)> Purchases { get; } = new();
+    public Task<IReadOnlyDictionary<string, string>> GetLocalizedPricesAsync(IReadOnlyList<string> productIds) =>
+        Task.FromResult<IReadOnlyDictionary<string, string>>(Prices.Where(p => productIds.Contains(p.Key)).ToDictionary(p => p.Key, p => p.Value));
+    public Task<StorePurchaseOutcome> PurchaseAsync(string productId, Guid appAccountToken)
+    {
+        Purchases.Add((productId, appAccountToken));
+        if (NextOutcome.Status == StorePurchaseStatus.Purchased) Unfinished.Add(new UnfinishedTransaction(NextOutcome.TransactionId!, productId));
+        return Task.FromResult(NextOutcome with { ProductId = productId });
+    }
+    public Task<IReadOnlyList<UnfinishedTransaction>> GetUnfinishedTransactionsAsync() => Task.FromResult<IReadOnlyList<UnfinishedTransaction>>(Unfinished.ToList());
+    public Task FinishAsync(string transactionId) { Finished.Add(transactionId); Unfinished.RemoveAll(u => u.TransactionId == transactionId); return Task.CompletedTask; }
 }

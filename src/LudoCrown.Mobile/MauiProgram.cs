@@ -63,6 +63,11 @@ public static class MauiProgram
         services.AddSingleton<IAudioPlayer, SilentAudioPlayer>();
 #endif
         services.AddSingleton<IFeedbackService, FeedbackService>();
+#if IOS
+        services.AddSingleton<IInAppPurchaseService, LudoCrown.Mobile.Platforms.iOS.StoreKitPurchaseService>();
+#else
+        services.AddSingleton<IInAppPurchaseService, UnsupportedInAppPurchases>(); // Windows/Android: dev sandbox or gold only
+#endif
 
         // ----- app services -----
         services.AddSingleton(sp => new HttpClient
@@ -90,6 +95,9 @@ public static class MauiProgram
         AddScreen<FriendsPage, FriendsViewModel>(services);
         AddScreen<SettingsPage, SettingsViewModel>(services);
         AddScreen<BlockedPlayersPage, BlockedPlayersViewModel>(services);
+        AddScreen<StorePage, StoreViewModel>(services);
+        AddScreen<LeaguePage, LeagueViewModel>(services);
+        AddScreen<PlayerProfilePage, PlayerProfileViewModel>(services);
         services.AddTransient<RulesPage>();
 
         return builder.Build();

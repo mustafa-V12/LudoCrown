@@ -6,7 +6,7 @@
                 xmlns:vm="clr-namespace:LudoCrown.App.ViewModels;assembly=LudoCrown.App.Logic"
                 x:Class="LudoCrown.Mobile.Views.GamePage"
                 x:DataType="vm:GameViewModel">
-    <Grid RowDefinitions="Auto,Auto,*,Auto,Auto" Padding="10,4,10,10" RowSpacing="8">
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto,Auto,Auto" Padding="10,4,10,10" RowSpacing="6">
 
         <!-- Top bar -->
         <Grid ColumnDefinitions="Auto,*,Auto">
@@ -14,30 +14,75 @@
                     SemanticProperties.Description="Leave game" />
             <Label Grid.Column="1" x:Name="StatusLabel" Text="{Binding Status}" FontAttributes="Bold" FontSize="16"
                    HorizontalTextAlignment="Center" VerticalOptions="Center" LineBreakMode="TailTruncation" MaxLines="2" />
+            <Button Grid.Column="2" Text="ⓘ" Command="{Binding RulesInfoCommand}" Style="{StaticResource LinkButton}" FontSize="20" WidthRequest="48"
+                    SemanticProperties.Description="Rules for this mode" />
         </Grid>
 
+        <!-- Mode and match type, always visible during the match -->
+        <Border Grid.Row="1" Padding="12,4" StrokeShape="RoundRectangle 12" StrokeThickness="1" HorizontalOptions="Center"
+                Stroke="{StaticResource Gold}" Background="{StaticResource Plum}">
+            <Label Text="{Binding ModeText}" FontSize="13" TextColor="{StaticResource Gold}" HorizontalTextAlignment="Center"
+                   SemanticProperties.Description="{Binding ModeChip}" />
+        </Border>
+
         <!-- Top seats: Emerald (top-left) and Topaz (top-right), matching their board corners -->
-        <Grid Grid.Row="1" ColumnDefinitions="*,*" ColumnSpacing="8">
+        <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="8">
             <ContentView x:Name="SeatTopLeft" />
             <ContentView Grid.Column="1" x:Name="SeatTopRight" />
         </Grid>
 
-        <controls:BoardView Grid.Row="2" x:Name="Board" HorizontalOptions="Fill" VerticalOptions="Fill" />
+        <controls:BoardView Grid.Row="3" x:Name="Board" HorizontalOptions="Fill" VerticalOptions="Fill" />
 
         <!-- Bottom seats: Ruby (bottom-left) and Sapphire (bottom-right), with the die between them -->
-        <Grid Grid.Row="3" ColumnDefinitions="*,Auto,*" ColumnSpacing="8">
+        <Grid Grid.Row="4" ColumnDefinitions="*,Auto,*" ColumnSpacing="8">
             <ContentView x:Name="SeatBottomLeft" VerticalOptions="Center" />
             <controls:DiceView Grid.Column="1" x:Name="Dice" />
             <ContentView Grid.Column="2" x:Name="SeatBottomRight" VerticalOptions="Center" />
         </Grid>
 
-        <!-- Quick reactions (online only; preset, no free text) -->
-        <ScrollView Grid.Row="4" Orientation="Horizontal" IsVisible="{Binding ShowReactions}" HorizontalScrollBarVisibility="Never">
-            <HorizontalStackLayout x:Name="ReactionBar" Spacing="8" HorizontalOptions="Center" />
-        </ScrollView>
+        <!-- Gem rerolls, pass, Shield boost and chat (online). State and reasons come from the server snapshot. -->
+        <VerticalStackLayout Grid.Row="5" Spacing="6">
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8" IsVisible="{Binding ShowRerollBar}">
+                <Border Padding="10,6" StrokeShape="RoundRectangle 14" Background="{StaticResource Velvet}" Stroke="{StaticResource PlumLight}" VerticalOptions="Center">
+                    <HorizontalStackLayout Spacing="4">
+                        <Label Text="💎" FontSize="14" VerticalOptions="Center" />
+                        <Label Text="{Binding GemsText}" FontAttributes="Bold" VerticalOptions="Center" SemanticProperties.Description="Gem balance" />
+                    </HorizontalStackLayout>
+                </Border>
+                <Button Grid.Column="1" Text="{Binding RerollButtonText}" Command="{Binding RerollCommand}" IsEnabled="{Binding CanReroll}"
+                        Padding="10,8" FontSize="15" SemanticProperties.Hint="{Binding RerollHint}" />
+                <Label Grid.Column="2" Text="{Binding RerollCountText}" Style="{StaticResource Caption}" VerticalOptions="Center" />
+                <Button Grid.Column="3" Text="Pass" Command="{Binding PassCommand}" IsVisible="{Binding CanPass}" Style="{StaticResource SecondaryButton}" Padding="12,8" />
+            </Grid>
+            <Label Text="{Binding RerollHint}" IsVisible="{Binding ShowRerollBar}" Style="{StaticResource Caption}" FontSize="12" HorizontalTextAlignment="Center" />
+
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsVisible="{Binding IsOnline}">
+                <Button Text="{Binding BoostButtonText}" Command="{Binding BoostCommand}" IsVisible="{Binding ShowBoost}" Style="{StaticResource SecondaryButton}"
+                        Padding="10,8" FontSize="15" SemanticProperties.Hint="{Binding BoostHint}" />
+                <Label Text="Ranked match: boosts are off" IsVisible="{Binding BoostsOffNotice}" Style="{StaticResource Caption}" FontSize="12" VerticalOptions="Center" />
+                <Button Grid.Column="1" Text="💬 Chat" Command="{Binding ToggleChatCommand}" IsVisible="{Binding ShowReactions}" Style="{StaticResource SecondaryButton}"
+                        Padding="12,8" FontSize="15" SemanticProperties.Description="Open quick chat" />
+            </Grid>
+
+            <Label Text="{Binding OfflineNote}" IsVisible="{Binding ShowOfflineNote}" Style="{StaticResource Caption}" FontSize="12" HorizontalTextAlignment="Center" />
+        </VerticalStackLayout>
+
+        <!-- Quick chat panel: preset phrases and emoji only (no free text). Tap a player's badge to mute them. -->
+        <Border Grid.Row="3" Grid.RowSpan="3" IsVisible="{Binding IsChatOpen}" Style="{StaticResource Card}" Padding="12" Margin="6,0"
+                VerticalOptions="End" Background="#F2140C2E" Stroke="{StaticResource Gold}">
+            <VerticalStackLayout Spacing="8">
+                <Grid ColumnDefinitions="*,Auto">
+                    <Label Text="Quick chat" Style="{StaticResource Heading}" VerticalOptions="Center" />
+                    <Button Grid.Column="1" Text="✕" Command="{Binding ToggleChatCommand}" Style="{StaticResource LinkButton}" SemanticProperties.Description="Close chat" />
+                </Grid>
+                <FlexLayout x:Name="PhraseGrid" Wrap="Wrap" JustifyContent="SpaceBetween" />
+                <FlexLayout x:Name="EmojiRow" Wrap="Wrap" JustifyContent="SpaceAround" />
+                <Label Text="Tap a player's badge to mute them. You can turn chat off in Settings." Style="{StaticResource Caption}" FontSize="12" />
+            </VerticalStackLayout>
+        </Border>
 
         <!-- Notice toast -->
-        <Border Grid.Row="2" IsVisible="{Binding HasNotice}" Style="{StaticResource Card}" Padding="16,10" Margin="24,0"
+        <Border Grid.Row="3" IsVisible="{Binding HasNotice}" Style="{StaticResource Card}" Padding="16,10" Margin="24,0"
                 VerticalOptions="End" HorizontalOptions="Center" Background="#E6140C2E" InputTransparent="True">
             <Label Text="{Binding Notice}" HorizontalTextAlignment="Center" FontSize="15" />
         </Border>

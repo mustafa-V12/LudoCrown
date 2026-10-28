@@ -17,6 +17,17 @@
                         <Grid ColumnDefinitions="*,Auto"><Label Text="Reduce motion" VerticalOptions="Center" /><Switch Grid.Column="1" IsToggled="{Binding ReduceMotion}" SemanticProperties.Description="Reduce motion" /></Grid>
                         <Grid ColumnDefinitions="*,Auto"><Label Text="Auto-move when only one move" VerticalOptions="Center" /><Switch Grid.Column="1" IsToggled="{Binding AutoMoveSingle}" SemanticProperties.Description="Auto move single option" /></Grid>
                         <Grid ColumnDefinitions="*,Auto"><Label Text="Show quick reactions" VerticalOptions="Center" /><Switch Grid.Column="1" IsToggled="{Binding ShowReactions}" SemanticProperties.Description="Show reactions" /></Grid>
+                        <Grid ColumnDefinitions="*,Auto"><Label Text="Confirm before spending gems" VerticalOptions="Center" /><Switch Grid.Column="1" IsToggled="{Binding ConfirmGemSpend}" SemanticProperties.Description="Confirm before spending gems" /></Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <Label Text="Profile privacy &amp; chat" Style="{StaticResource Heading}" IsVisible="{Binding IsSignedIn}" />
+                <Border Style="{StaticResource Card}" IsVisible="{Binding IsSignedIn}">
+                    <VerticalStackLayout Spacing="6" IsEnabled="{Binding PrivacyLoaded}">
+                        <Grid ColumnDefinitions="*,Auto"><Label Text="Show my statistics to other players" VerticalOptions="Center" /><Switch Grid.Column="1" IsToggled="{Binding ShowStatsPublicly}" SemanticProperties.Description="Show my statistics publicly" /></Grid>
+                        <Grid ColumnDefinitions="*,Auto"><Label Text="Show my league standing" VerticalOptions="Center" /><Switch Grid.Column="1" IsToggled="{Binding ShowLeaguePublicly}" SemanticProperties.Description="Show my league standing publicly" /></Grid>
+                        <Grid ColumnDefinitions="*,Auto"><Label Text="Match chat (quick messages &amp; emoji)" VerticalOptions="Center" /><Switch Grid.Column="1" IsToggled="{Binding ChatEnabled}" SemanticProperties.Description="Match chat" /></Grid>
+                        <Label Text="Your email and sign-in methods are never shown to other players. Chat uses preset messages only." Style="{StaticResource Caption}" FontSize="12" />
                     </VerticalStackLayout>
                 </Border>
 
@@ -44,7 +55,9 @@
                     <VerticalStackLayout Spacing="6">
                         <Label Text="Development" Style="{StaticResource Heading}" />
                         <Label Text="{Binding ServerUrl, StringFormat='Server: {0}'}" Style="{StaticResource Caption}" />
+                        <Label Text="{Binding EnvironmentText}" Style="{StaticResource Caption}" />
                         <Button Text="Change server URL" Command="{Binding SetServerCommand}" Style="{StaticResource LinkButton}" HorizontalOptions="Start" />
+                        <Button Text="Add test gold, gems &amp; Shields (development server only)" Command="{Binding DevGrantCommand}" IsVisible="{Binding IsSignedIn}" Style="{StaticResource SecondaryButton}" />
                     </VerticalStackLayout>
                 </Border>
 

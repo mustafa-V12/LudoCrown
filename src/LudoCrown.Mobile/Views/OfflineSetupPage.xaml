@@ -2,6 +2,7 @@
 <views:BasePage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
                 xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
                 xmlns:views="clr-namespace:LudoCrown.Mobile.Views"
+                xmlns:controls="clr-namespace:LudoCrown.Mobile.Controls"
                 xmlns:vm="clr-namespace:LudoCrown.App.ViewModels;assembly=LudoCrown.App.Logic"
                 x:Class="LudoCrown.Mobile.Views.OfflineSetupPage"
                 x:DataType="vm:OfflineSetupViewModel">
@@ -15,6 +16,11 @@
                         <Button Grid.Column="1" Text="Resume" Command="{Binding ResumeCommand}" />
                     </Grid>
                 </Border>
+
+                <Label Text="Game mode" Style="{StaticResource Heading}" />
+                <controls:ModeSelector Picker="{Binding Modes}" />
+                <Label Text="{Binding Modes.SelectedSummary}" FontAttributes="Bold" />
+                <Label Text="Gem rerolls and Shield bottles are online-only, because gems are kept on the server." Style="{StaticResource Caption}" />
 
                 <Label Text="Players" Style="{StaticResource Heading}" />
                 <Grid ColumnDefinitions="*,*" ColumnSpacing="12">

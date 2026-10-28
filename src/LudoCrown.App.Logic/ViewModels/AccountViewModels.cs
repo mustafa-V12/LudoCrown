@@ -13,6 +13,9 @@ public sealed record HistoryRow(string Title, string Detail, bool Won);
 
 public sealed record AvatarOption(string Id, bool IsSelected);
 
+/// <summary>A cosmetic frame the player owns, with whether it is equipped.</summary>
+public sealed record FrameOption(string Id, string Name, bool IsEquipped);
+
 public sealed class ProfileViewModel : ViewModelBase
 {
     private readonly ApiClient _api;
@@ -33,7 +36,21 @@ public sealed class ProfileViewModel : ViewModelBase
         AvatarCommand = new AsyncCommand(p => SetAvatarAsync(p as string));
         LinkCommand = new AsyncCommand(LinkAsync);
         RefreshCommand = new AsyncCommand(LoadAsync);
+        EquipFrameCommand = new AsyncCommand(p => EquipFrameAsync(p as FrameOption));
+        StoreCommand = new AsyncCommand(() => _nav.GoToAsync(Routes.Store));
+        LeagueCommand = new AsyncCommand(() => _nav.GoToAsync(Routes.League));
     }
+
+    private InventoryResponse? _inventory;
+    public ObservableCollection<StatRow> ModeStats { get; } = new();
+    public ObservableCollection<FrameOption> Frames { get; } = new();
+    public ICommand EquipFrameCommand { get; }
+    public ICommand StoreCommand { get; }
+    public ICommand LeagueCommand { get; }
+    public string GemsText => _inventory is null ? "" : $"{_inventory.Balances.Gems:N0} gems";
+    public string ShieldsText => _inventory is null ? "" : $"{_inventory.Balances.Count(Core.Model.Boosts.ShieldId)} Shield bottles";
+    public bool HasFrames => Frames.Count > 0;
+    public string? EquippedFrame => _inventory?.EquippedFrame;
 
     public MeResponse? Me { get => _me; private set { Set(ref _me, value); Refresh(); } }
     public ObservableCollection<HistoryRow> History { get; } = new();
@@ -74,12 +91,28 @@ public sealed class ProfileViewModel : ViewModelBase
         var me = await _api.GetAsync<MeResponse>("/me");
         if (!me.Ok) { Error = me.Message; return; }
         Me = me.Value;
-        var history = await _api.GetAsync<List<MatchHistoryDto>>("/me/matches?limit=30");
+        var inventory = await _api.GetAsync<InventoryResponse>("/me/inventory");
+        if (inventory.Ok)
+        {
+            _inventory = inventory.Value;
+            Frames.Clear();
+            foreach (var f in _inventory!.Balances.Items.Where(i => i.Kind == "Frame"))
+                Frames.Add(new FrameOption(f.Id, f.Name, f.Id == _inventory.EquippedFrame));
+            foreach (var n in new[] { nameof(GemsText), nameof(ShieldsText), nameof(HasFrames), nameof(EquippedFrame) }) OnPropertyChanged(n);
+        }
+        var modes = await _api.GetAsync<List<ModeStatsDto>>("/me/stats/modes");
+        ModeStats.Clear();
+        foreach (var m in modes.Value ?? new())
+            ModeStats.Add(new StatRow(m.ModeName, m.GamesPlayed.ToString(), m.GamesWon.ToString(), m.GamesPlayed == 0 ? "—" : $"{m.WinRatePercent}%", $"{m.CurrentWinStreak} (best {m.BestWinStreak})"));
+
+        var history = await _api.GetAsync<List<MatchHistoryDto>>("/me/matches?limit=20");
         History.Clear();
         foreach (var h in history.Value ?? new())
         {
             var place = h.Result == "Abandoned" ? "Left early" : h.Placement == 1 ? "Won" : $"Placed {h.Placement}";
-            var mode = h.Mode == "Private" ? "Private table" : $"{h.PlayerCount}-player online";
+            var kind = h.Mode switch { "Private" => "Private table", "Casual" => "Casual", _ => "Ranked" };
+            var gameMode = Core.Model.GameModes.Parse(h.GameMode) is Core.Model.GameMode gm ? Core.Model.GameModes.Get(gm).Name : "Classic";
+            var mode = $"{gameMode} · {kind} · {h.PlayerCount}p" + (h.LeaguePoints is int lp ? $" · {(lp >= 0 ? "+" : "")}{lp} league pts" : "");
             var when = (h.EndedAt ?? h.StartedAt).ToLocalTime().ToString("d MMM, HH:mm");
             History.Add(new HistoryRow($"{place} · {mode}", $"vs {string.Join(", ", h.Opponents)} · {when}", h.Placement == 1 && h.Result != "Abandoned"));
         }
@@ -94,6 +127,14 @@ public sealed class ProfileViewModel : ViewModelBase
         var r = await _api.PatchAsync<object>("/me/profile", new { displayName = name });
         if (!r.Ok) { await _dialogs.AlertAsync("Couldn't save", r.Message ?? ""); return; }
         await LoadAsync();
+    }
+
+    private async Task EquipFrameAsync(FrameOption? frame)
+    {
+        if (frame is null) return;
+        var r = await _api.PostAsync<object>("/me/frame", new { frameId = frame.IsEquipped ? null : frame.Id }, auth: true);
+        if (r.Ok) await LoadAsync();
+        else Error = r.Message;
     }
 
     private async Task SetAvatarAsync(string? id)
@@ -201,9 +242,13 @@ public sealed class FriendsViewModel : ViewModelBase
 
     private async Task OptionsAsync(FriendDto f)
     {
-        var choice = await _dialogs.ActionSheetAsync(f.DisplayName, "Cancel", "Remove friend", "Block", "Report");
+        var choice = await _dialogs.ActionSheetAsync(f.DisplayName, "Cancel", "View profile", "Remove friend", "Block", "Report");
         switch (choice)
         {
+            case "View profile" when f.FriendCode.Length == 8:
+                _state.ViewedPlayerId = f.FriendCode;
+                await _nav.GoToAsync(Routes.PlayerProfile);
+                return;
             case "Remove friend":
                 await _api.DeleteAsync<object>($"/friends/{f.UserId}");
                 break;
@@ -230,14 +275,21 @@ public sealed class FriendsViewModel : ViewModelBase
 
 public static class ReportFlow
 {
-    public static async Task ReportAsync(ApiClient api, IDialogService dialogs, Guid userId, string name, Guid? matchId)
+    /// <summary>Reports by public id (friend code) — the app never needs internal account ids.</summary>
+    public static Task ReportAsync(ApiClient api, IDialogService dialogs, string publicId, string name, Guid? matchId) =>
+        ReportCoreAsync(api, dialogs, name, (reason, details) => new { publicId, matchId, reason, details });
+
+    public static Task ReportAsync(ApiClient api, IDialogService dialogs, Guid userId, string name, Guid? matchId) =>
+        ReportCoreAsync(api, dialogs, name, (reason, details) => new { userId, matchId, reason, details });
+
+    private static async Task ReportCoreAsync(ApiClient api, IDialogService dialogs, string name, Func<string, string, object> body)
     {
         var reasons = new Dictionary<string, string> { ["Offensive name"] = "offensive_name", ["Cheating"] = "cheating", ["Harassment"] = "harassment", ["Something else"] = "other" };
         var choice = await dialogs.ActionSheetAsync($"Report {name}", "Cancel", reasons.Keys.ToArray());
         if (choice is null || !reasons.TryGetValue(choice, out var reason)) return;
         var details = await dialogs.PromptAsync("Details (optional)", "Tell us briefly what happened.", "Send report", null, 500);
         if (details is null) return;
-        var r = await api.PostAsync<object>("/reports", new { userId, matchId, reason, details }, auth: true);
+        var r = await api.PostAsync<object>("/reports", body(reason, details), auth: true);
         await dialogs.AlertAsync(r.Ok ? "Thanks" : "Couldn't send report", r.Ok ? "Our team will review your report." : r.Message ?? "");
     }
 }
@@ -269,7 +321,37 @@ public sealed class SettingsViewModel : ViewModelBase
         RulesCommand = new AsyncCommand(() => _nav.GoToAsync(Routes.Rules));
         BlockedCommand = new AsyncCommand(() => _nav.GoToAsync(Routes.BlockedPlayers));
         SetServerCommand = new AsyncCommand(SetServerAsync);
+        DevGrantCommand = new AsyncCommand(DevGrantAsync);
     }
+
+    private PrivacyDto? _privacy;
+    public ICommand DevGrantCommand { get; }
+    public bool ConfirmGemSpend { get => _settings.GetBool(SettingKeys.ConfirmGemSpend, true); set { _settings.SetBool(SettingKeys.ConfirmGemSpend, value); OnPropertyChanged(); } }
+    public bool PrivacyLoaded => _privacy is not null;
+    public bool ShowStatsPublicly { get => _privacy?.ShowStats ?? true; set => _ = SavePrivacyAsync(showStats: value); }
+    public bool ShowLeaguePublicly { get => _privacy?.ShowLeague ?? true; set => _ = SavePrivacyAsync(showLeague: value); }
+    public bool ChatEnabled { get => _privacy?.ChatEnabled ?? true; set => _ = SavePrivacyAsync(chatEnabled: value); }
+    public string EnvironmentText => _config.EnvironmentLabel;
+
+    private async Task SavePrivacyAsync(bool? showStats = null, bool? showLeague = null, bool? chatEnabled = null)
+    {
+        if (_privacy is null) return;
+        var r = await _api.PatchAsync<PrivacyDto>("/me/privacy", new { showStats, showLeague, chatEnabled });
+        if (r.Ok) _privacy = r.Value;
+        else Error = r.Message;
+        OnPropertyChanged(nameof(ShowStatsPublicly));
+        OnPropertyChanged(nameof(ShowLeaguePublicly));
+        OnPropertyChanged(nameof(ChatEnabled));
+    }
+
+    /// <summary>DEVELOPMENT ONLY: asks the development server for test currency. The server refuses this outside Development.</summary>
+    private Task DevGrantAsync() => RunBusyAsync(async () =>
+    {
+        if (!_config.IsDevelopment) return;
+        var r = await _api.PostAsync<BalancesDto>("/dev/economy/grant", new { coins = 5000, gems = 20, shields = 3 }, auth: true);
+        await _dialogs.AlertAsync(r.Ok ? "Test items added (development)" : "Not available",
+            r.Ok ? $"Now {r.Value!.Coins:N0} gold, {r.Value.Gems} gems, {r.Value.Count(Core.Model.Boosts.ShieldId)} Shield bottles." : r.Message ?? "The server didn't allow it.");
+    });
 
     public bool Sound { get => _settings.GetBool(SettingKeys.Sound, true); set { _settings.SetBool(SettingKeys.Sound, value); OnPropertyChanged(); } }
     public bool Haptics { get => _settings.GetBool(SettingKeys.Haptics, true); set { _settings.SetBool(SettingKeys.Haptics, value); OnPropertyChanged(); } }
@@ -289,10 +371,15 @@ public sealed class SettingsViewModel : ViewModelBase
     public ICommand BlockedCommand { get; }
     public ICommand SetServerCommand { get; }
 
-    public override Task OnAppearingAsync()
+    public override async Task OnAppearingAsync()
     {
         OnPropertyChanged(nameof(IsSignedIn));
-        return Task.CompletedTask;
+        if (_session.IsSignedIn)
+        {
+            var r = await _api.GetAsync<PrivacyDto>("/me/privacy");
+            if (r.Ok) _privacy = r.Value;
+        }
+        foreach (var p in new[] { nameof(PrivacyLoaded), nameof(ShowStatsPublicly), nameof(ShowLeaguePublicly), nameof(ChatEnabled), nameof(EnvironmentText) }) OnPropertyChanged(p);
     }
 
     private async Task SignOutAsync()

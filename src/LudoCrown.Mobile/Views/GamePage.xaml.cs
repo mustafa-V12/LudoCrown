@@ -9,11 +9,6 @@ namespace LudoCrown.Mobile.Views;
 
 public partial class GamePage : BasePage
 {
-    private static readonly Dictionary<string, string> ReactionEmoji = new()
-    {
-        ["wave"] = "👋", ["gg"] = "🤝 GG", ["wow"] = "😮", ["laugh"] = "😂", ["crown"] = "👑", ["oops"] = "😅", ["thanks"] = "🙏", ["hurry"] = "⏳",
-    };
-
     private readonly GameViewModel _vm;
     private readonly ISettingsStore _settings;
     private readonly Dictionary<PlayerColor, PlayerChip> _chips = new();
@@ -30,21 +25,20 @@ public partial class GamePage : BasePage
         _vm.BoardChanged += OnBoardChanged;
         _vm.ReactionReceived += OnReaction;
 
-        foreach (var id in Reactions.All)
+        var secondary = (Style)Application.Current!.Resources["SecondaryButton"];
+        foreach (var item in _vm.ChatPhrases)
         {
-            var b = new Button
-            {
-                Text = ReactionEmoji.GetValueOrDefault(id, id),
-                Style = (Style)Application.Current!.Resources["SecondaryButton"],
-                Padding = new Thickness(12, 6),
-                MinimumWidthRequest = 52,
-                FontSize = 18,
-                Command = _vm.ReactCommand,
-                CommandParameter = id,
-            };
-            SemanticProperties.SetDescription(b, $"Send reaction {id}");
-            ReactionBar.Children.Add(b);
+            var b = new Button { Text = item.Text, Style = secondary, Padding = new Thickness(10, 6), FontSize = 14, Margin = new Thickness(3), Command = _vm.ReactCommand, CommandParameter = item.Id };
+            SemanticProperties.SetDescription(b, $"Send: {item.Text}");
+            PhraseGrid.Children.Add(b);
         }
+        foreach (var item in _vm.ChatEmoji)
+        {
+            var b = new Button { Text = item.Text, Style = secondary, Padding = new Thickness(8, 4), FontSize = 22, Margin = new Thickness(3), MinimumWidthRequest = 50, Command = _vm.ReactCommand, CommandParameter = item.Id };
+            SemanticProperties.SetDescription(b, $"Send emoji {item.Id}");
+            EmojiRow.Children.Add(b);
+        }
+        _vm.MuteChanged += () => { foreach (var (_, chip) in _chips) chip.SetMuted(_vm.IsMuted(chip.Seat)); };
     }
 
     protected override void OnAppearing()
@@ -98,7 +92,9 @@ public partial class GamePage : BasePage
         foreach (var slot in new[] { SeatTopLeft, SeatTopRight, SeatBottomLeft, SeatBottomRight }) slot.Content = null;
         foreach (var seat in state.Seats)
         {
-            var chip = new PlayerChip(seat.Color is PlayerColor.Topaz or PlayerColor.Sapphire);
+            var chip = new PlayerChip(seat.Color is PlayerColor.Topaz or PlayerColor.Sapphire) { Seat = seat.Seat };
+            var tap = new TapGestureRecognizer { Command = _vm.OpenPlayerCommand, CommandParameter = seat.Seat };
+            chip.GestureRecognizers.Add(tap);
             _chips[seat.Color] = chip;
             var slot = seat.Color switch
             {
@@ -124,7 +120,7 @@ public partial class GamePage : BasePage
     private async void OnReaction(ReactionInfo reaction, SeatView seat)
     {
         if (!_chips.TryGetValue(seat.Color, out var chip)) return;
-        await chip.ShowReactionAsync(ReactionEmoji.GetValueOrDefault(reaction.ReactionId, reaction.ReactionId));
+        await chip.ShowReactionAsync(Reactions.TextFor(reaction.ReactionId));
     }
 }
 
@@ -134,7 +130,17 @@ public sealed class PlayerChip : ContentView
     private readonly AvatarView _avatar = new() { Size = 44 };
     private readonly Label _name = new() { FontAttributes = FontAttributes.Bold, FontSize = 15, LineBreakMode = LineBreakMode.TailTruncation };
     private readonly Label _detail = new() { FontSize = 12, TextColor = Palette.Gold };
-    private readonly Label _bubble = new() { FontSize = 22, IsVisible = false, HorizontalOptions = LayoutOptions.Center };
+    private readonly Label _bubble = new() { FontSize = 16, FontAttributes = FontAttributes.Bold, IsVisible = false, HorizontalOptions = LayoutOptions.Center, VerticalOptions = LayoutOptions.Center,
+        BackgroundColor = Color.FromArgb("#F2FBF3E4"), TextColor = Color.FromArgb("#1A1230"), Padding = new Thickness(10, 4) };
+    private bool _muted;
+
+    public int Seat { get; init; }
+
+    public void SetMuted(bool muted)
+    {
+        _muted = muted;
+        if (_seat is not null) _detail.Text = Detail(_seat, false) + (muted ? " · 🔇" : "");
+    }
     private readonly Border _frame;
     private SeatView? _seat;
 
@@ -173,7 +179,7 @@ public sealed class PlayerChip : ContentView
         _name.Text = seat.Name;
         _frame.Stroke = isTurn ? Palette.Gold : Palette.Of(seat.Color).WithAlpha(0.6f);
         _frame.Opacity = seat.IsConnected ? 1 : 0.6;
-        _detail.Text = Detail(seat, isWinner);
+        _detail.Text = Detail(seat, isWinner) + (_muted ? " · 🔇" : "");
         SemanticProperties.SetDescription(this, $"{seat.Name}, {seat.Color}. {_detail.Text}{(isTurn ? ". Current turn" : "")}");
     }
 
@@ -198,7 +204,7 @@ public sealed class PlayerChip : ContentView
     private static string Detail(SeatView s, bool winner)
     {
         if (winner) return "👑 Winner";
-        var home = $"{s.FinishedCount}/4 home";
+        var home = $"{s.FinishedCount}/4 home" + (s.ShieldActive ? " · 🛡 Shield" : "");
         if (!s.IsConnected) return $"Reconnecting… · {home}";
         return s.IsBot ? $"Bot · {home}" : home;
     }

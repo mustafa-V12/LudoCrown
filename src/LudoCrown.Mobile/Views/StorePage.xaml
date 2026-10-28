@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<views:BasePage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                xmlns:views="clr-namespace:LudoCrown.Mobile.Views"
+                xmlns:vm="clr-namespace:LudoCrown.App.ViewModels;assembly=LudoCrown.App.Logic"
+                x:Class="LudoCrown.Mobile.Views.StorePage"
+                x:DataType="vm:StoreViewModel">
+    <views:BasePage.Resources>
+        <DataTemplate x:Key="ItemTemplate" x:DataType="vm:StoreItemView">
+            <Border Style="{StaticResource Card}" Padding="14,12">
+                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="12">
+                    <Label Text="{Binding Title}" FontAttributes="Bold" FontSize="17" />
+                    <Label Grid.Row="1" Text="{Binding ContentsText}" TextColor="{StaticResource Gold}" FontAttributes="Bold" />
+                    <Label Grid.Row="2" Text="{Binding Description}" Style="{StaticResource Caption}" FontSize="13" />
+                    <Label Grid.Row="3" Grid.ColumnSpan="2" Text="{Binding StatusText}" IsVisible="{Binding HasStatus}" FontSize="13" Margin="0,6,0,0" />
+                    <VerticalStackLayout Grid.Column="1" Grid.RowSpan="3" VerticalOptions="Center" Spacing="4">
+                        <Label Text="{Binding PriceText}" HorizontalOptions="Center" FontAttributes="Bold" />
+                        <Button Text="{Binding BuyText}" IsEnabled="{Binding CanBuy}" MinimumWidthRequest="110"
+                                Command="{Binding BuyCommand, Source={RelativeSource AncestorType={x:Type vm:StoreViewModel}}, x:DataType=vm:StoreViewModel}"
+                                CommandParameter="{Binding .}" SemanticProperties.Description="{Binding Title}" />
+                    </VerticalStackLayout>
+                </Grid>
+            </Border>
+        </DataTemplate>
+    </views:BasePage.Resources>
+    <Grid RowDefinitions="Auto,*">
+        <views:PageHeader Title="Store" />
+        <RefreshView Grid.Row="1" Command="{Binding RefreshCommand}" IsRefreshing="{Binding IsBusy, Mode=OneWay}">
+            <ScrollView>
+                <VerticalStackLayout Padding="20,8,20,28" Spacing="14" MaximumWidthRequest="560">
+                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
+                        <Border Style="{StaticResource Card}" Padding="10"><VerticalStackLayout><Label Text="{Binding CoinsText}" FontSize="20" FontAttributes="Bold" TextColor="{StaticResource Gold}" HorizontalOptions="Center" /><Label Text="Gold" Style="{StaticResource Caption}" HorizontalOptions="Center" /></VerticalStackLayout></Border>
+                        <Border Grid.Column="1" Style="{StaticResource Card}" Padding="10"><VerticalStackLayout><Label Text="{Binding GemsText}" FontSize="20" FontAttributes="Bold" TextColor="{StaticResource Emerald}" HorizontalOptions="Center" /><Label Text="Gems" Style="{StaticResource Caption}" HorizontalOptions="Center" /></VerticalStackLayout></Border>
+                        <Border Grid.Column="2" Style="{StaticResource Card}" Padding="10"><VerticalStackLayout><Label Text="{Binding ShieldsText}" FontSize="20" FontAttributes="Bold" TextColor="{StaticResource Sapphire}" HorizontalOptions="Center" /><Label Text="Shield bottles" Style="{StaticResource Caption}" HorizontalOptions="Center" /></VerticalStackLayout></Border>
+                    </Grid>
+
+                    <Border Style="{StaticResource Card}" IsVisible="{Binding HasNotice}" Stroke="{StaticResource Gold}" StrokeThickness="2">
+                        <Label Text="{Binding Notice}" FontAttributes="Bold" />
+                    </Border>
+                    <Label Text="{Binding FairnessText}" Style="{StaticResource Caption}" />
+
+                    <Label Text="Gems" Style="{StaticResource Heading}" />
+                    <Label Text="{Binding GemUseText}" Style="{StaticResource Caption}" />
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding Gems}" BindableLayout.ItemTemplate="{StaticResource ItemTemplate}" Spacing="8" />
+
+                    <Label Text="Gold" Style="{StaticResource Heading}" />
+                    <Label Text="{Binding GoldUseText}" Style="{StaticResource Caption}" />
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding Gold}" BindableLayout.ItemTemplate="{StaticResource ItemTemplate}" Spacing="8" />
+
+                    <Label Text="Shield bottles" Style="{StaticResource Heading}" />
+                    <Label Text="{Binding ShieldUseText}" Style="{StaticResource Caption}" />
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding Boosts}" BindableLayout.ItemTemplate="{StaticResource ItemTemplate}" Spacing="8" />
+
+                    <Label Text="Avatar frames" Style="{StaticResource Heading}" />
+                    <VerticalStackLayout BindableLayout.ItemsSource="{Binding Cosmetics}" BindableLayout.ItemTemplate="{StaticResource ItemTemplate}" Spacing="8" />
+
+                    <Button Text="Check pending purchases" Command="{Binding RecoverCommand}" Style="{StaticResource SecondaryButton}" />
+                    <Label Text="{Binding Error}" IsVisible="{Binding HasError}" Style="{StaticResource ErrorText}" />
+                </VerticalStackLayout>
+            </ScrollView>
+        </RefreshView>
+    </Grid>
+</views:BasePage>

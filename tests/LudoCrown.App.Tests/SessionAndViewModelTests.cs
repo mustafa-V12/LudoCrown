@@ -224,7 +224,7 @@ public class ViewModelTests
         h.Connection.ResyncResult = FakeConnection.Snapshot(0);
         var vm = new MatchmakingViewModel(h.Connection, h.State, h.Nav, new InlineMainThread());
         await vm.OnAppearingAsync();
-        Assert.Contains("find:4", h.Connection.Calls);
+        Assert.Contains("find:4:Classic:Ranked", h.Connection.Calls);
         Assert.True(vm.Searching);
         h.Connection.PushMatchmaking(new MatchmakingStatus(MatchmakingState.Searching, 4, 3, null, null));
         Assert.Equal("3 of 4 players", vm.PlayersText);

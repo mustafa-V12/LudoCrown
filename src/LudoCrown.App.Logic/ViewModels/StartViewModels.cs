@@ -4,6 +4,7 @@ using LudoCrown.App.Auth;
 using LudoCrown.App.Game;
 using LudoCrown.App.Mvvm;
 using LudoCrown.App.Services;
+using LudoCrown.Core.Model;
 using LudoCrown.Core.Protocol;
 
 namespace LudoCrown.App.ViewModels;
@@ -153,11 +154,27 @@ public sealed class HomeViewModel : ViewModelBase
     private readonly IDialogService _dialogs;
     private readonly AppState _state;
     private readonly ISettingsStore _settings;
+    private readonly AppConfig? _config;
     private MeResponse? _me;
     private bool _hasSavedGame;
+    private bool _serverReachable = true;
 
-    public HomeViewModel(SessionService session, ApiClient api, INavigationService nav, IDialogService dialogs, AppState state, ISettingsStore settings)
+    public HomeViewModel(SessionService session, ApiClient api, INavigationService nav, IDialogService dialogs, AppState state, ISettingsStore settings, AppConfig? config = null)
     {
+        _config = config;
+        Modes = new ModePicker(state, settings);
+        if (Enum.TryParse<MatchQueue>(settings.GetString(SettingKeys.LastQueue), out var q)) state.SelectedQueue = q;
+        SelectQueueCommand = new AsyncCommand(p =>
+        {
+            _state.SelectedQueue = p?.ToString() == "casual" ? MatchQueue.Casual : MatchQueue.Ranked;
+            _settings.SetString(SettingKeys.LastQueue, _state.SelectedQueue.ToString());
+            OnPropertyChanged(nameof(IsRanked));
+            OnPropertyChanged(nameof(IsCasual));
+            OnPropertyChanged(nameof(QueueDescription));
+            return Task.CompletedTask;
+        });
+        StoreCommand = new AsyncCommand(() => RequireAccountAsync(Routes.Store));
+        LeagueCommand = new AsyncCommand(() => RequireAccountAsync(Routes.League));
         _session = session;
         _api = api;
         _nav = nav;
@@ -184,6 +201,21 @@ public sealed class HomeViewModel : ViewModelBase
     public ICommand SettingsCommand { get; }
     public ICommand SignInCommand { get; }
     public ICommand RulesCommand { get; }
+    public ICommand SelectQueueCommand { get; }
+    public ICommand StoreCommand { get; }
+    public ICommand LeagueCommand { get; }
+
+    public ModePicker Modes { get; }
+    public bool IsRanked => _state.SelectedQueue == MatchQueue.Ranked;
+    public bool IsCasual => _state.SelectedQueue == MatchQueue.Casual;
+    public string QueueDescription => MatchLabels.QueueDescription(_state.SelectedQueue);
+    public string GemsText => _me is null ? "" : $"{_me.Gems:N0}";
+
+    /// <summary>Which backend the app is using — offline, a local development server, or the live service. Never hidden.</summary>
+    public string EnvironmentText => !_session.IsSignedIn ? "Offline — sign in to play online"
+        : !_serverReachable ? "Server unreachable — offline play still works"
+        : _config is null ? "Online" : _config.EnvironmentLabel;
+    public bool IsDevEnvironment => _session.IsSignedIn && (_config?.IsDevelopment == true || _config?.IsLocalServer == true);
 
     public bool IsSignedIn => _session.IsSignedIn;
     public bool IsSignedOut => !_session.IsSignedIn;
@@ -201,8 +233,10 @@ public sealed class HomeViewModel : ViewModelBase
         if (_session.IsSignedIn)
         {
             var me = await _api.GetAsync<MeResponse>("/me");
+            _serverReachable = me.Kind != ApiErrorKind.Network;
             if (me.Ok) { _me = me.Value; Refresh(); }
             else if (me.Kind == ApiErrorKind.Unauthorized) { await _session.SignOutAsync(); Refresh(); }
+            else Refresh();
         }
         if (_state.PendingJoinCode is string code)
         {
@@ -213,7 +247,8 @@ public sealed class HomeViewModel : ViewModelBase
 
     private void Refresh()
     {
-        foreach (var p in new[] { nameof(IsSignedIn), nameof(IsSignedOut), nameof(IsGuest), nameof(DisplayName), nameof(AvatarId), nameof(LevelText), nameof(CoinsText) })
+        foreach (var p in new[] { nameof(IsSignedIn), nameof(IsSignedOut), nameof(IsGuest), nameof(DisplayName), nameof(AvatarId), nameof(LevelText), nameof(CoinsText), nameof(GemsText),
+                     nameof(EnvironmentText), nameof(IsDevEnvironment), nameof(IsRanked), nameof(IsCasual), nameof(QueueDescription) })
             OnPropertyChanged(p);
     }
 
@@ -240,7 +275,7 @@ public sealed class HomeViewModel : ViewModelBase
     private async Task CreateTableAsync()
     {
         if (!await EnsureOnlineAsync()) return;
-        var choice = await _dialogs.ActionSheetAsync("Private table", "Cancel", "2 players", "4 players");
+        var choice = await _dialogs.ActionSheetAsync($"Private table · {Modes.Selected.Name}", "Cancel", "2 players", "4 players");
         if (choice is null || choice == "Cancel") return;
         _state.RequestedPlayerCount = choice.StartsWith('4') ? 4 : 2;
         _state.PrivateRoomMode = PrivateRoomMode.Create;

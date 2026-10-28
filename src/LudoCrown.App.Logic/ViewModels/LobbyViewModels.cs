@@ -5,6 +5,7 @@ using LudoCrown.App.Mvvm;
 using LudoCrown.App.Services;
 using LudoCrown.Core.AI;
 using LudoCrown.Core.Dice;
+using LudoCrown.Core.Model;
 using LudoCrown.Core.Protocol;
 
 namespace LudoCrown.App.ViewModels;
@@ -45,7 +46,9 @@ public sealed class MatchmakingViewModel : ViewModelBase
     }
 
     public int PlayerCount => _state.RequestedPlayerCount;
-    public string Title => $"{PlayerCount}-player match";
+    public GameModeInfo Mode => GameModes.Get(_state.SelectedMode);
+    public string Title => $"{PlayerCount}-player {Mode.Name} · {MatchLabels.Queue(_state.SelectedQueue)}";
+    public string RulesText => $"{Mode.WinCondition} {MatchLabels.QueueDescription(_state.SelectedQueue)}";
     public string Status { get => _status; private set => Set(ref _status, value); }
     public int PlayersFound { get => _found; private set { if (Set(ref _found, value)) OnPropertyChanged(nameof(PlayersText)); } }
     public string PlayersText => $"{Math.Max(1, PlayersFound)} of {PlayerCount} players";
@@ -74,7 +77,7 @@ public sealed class MatchmakingViewModel : ViewModelBase
             await _connection.ConnectAsync();
             Searching = true;
             Status = "Finding players…";
-            var status = await _connection.FindMatchAsync(PlayerCount);
+            var status = await _connection.FindMatchAsync(PlayerCount, _state.SelectedMode, _state.SelectedQueue);
             await HandleAsync(status);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -146,6 +149,8 @@ public sealed class PrivateRoomViewModel : ViewModelBase
     public ObservableCollection<SeatInfo> Seats { get; } = new();
     public RoomInfo? Room { get => _room; private set { Set(ref _room, value); Refresh(); } }
     public string Code => _room?.Code ?? "······";
+    public string ModeText => _room is null ? "" : $"{GameModes.Get(_room.Mode).Name}: {GameModes.Get(_room.Mode).WinCondition}";
+    public string ModeDetail => _room is null ? "" : $"Up to {GameModes.Get(_room.Mode).MaxRerolls} gem rerolls · 1 Shield bottle per player · no league points.";
     public bool IsHost => _room?.IsHost ?? false;
     public bool CanStart => IsHost && Seats.Count >= 2;
     public string SeatsText => _room is null ? "" : $"{Seats.Count} of {_room.PlayerCount} seated";
@@ -177,7 +182,7 @@ public sealed class PrivateRoomViewModel : ViewModelBase
             await _connection.ConnectAsync();
             HubResult<RoomInfo> result = _state.PrivateRoomMode switch
             {
-                PrivateRoomMode.Create => await _connection.CreatePrivateRoomAsync(_state.RequestedPlayerCount),
+                PrivateRoomMode.Create => await _connection.CreatePrivateRoomAsync(_state.RequestedPlayerCount, _state.SelectedMode),
                 PrivateRoomMode.Join => await _connection.JoinPrivateRoomAsync(_state.PrivateRoomCode ?? ""),
                 _ => new HubResult<RoomInfo>(_state.PendingRoom, null),
             };
@@ -213,7 +218,7 @@ public sealed class PrivateRoomViewModel : ViewModelBase
 
     private void Refresh()
     {
-        foreach (var p in new[] { nameof(Code), nameof(IsHost), nameof(CanStart), nameof(SeatsText), nameof(HintText) }) OnPropertyChanged(p);
+        foreach (var p in new[] { nameof(Code), nameof(IsHost), nameof(CanStart), nameof(SeatsText), nameof(HintText), nameof(ModeText), nameof(ModeDetail) }) OnPropertyChanged(p);
         (StartCommand as AsyncCommand)?.RaiseCanExecuteChanged();
     }
 
@@ -283,9 +288,11 @@ public sealed class OfflineSetupViewModel : ViewModelBase
         StartCommand = new AsyncCommand(StartAsync);
         ResumeCommand = new AsyncCommand(ResumeAsync);
         SetPlayersCommand = new AsyncCommand(p => { PlayerCount = Convert.ToInt32(p); return Task.CompletedTask; });
+        Modes = new ModePicker(state, settings);
         BuildSeats();
     }
 
+    public ModePicker Modes { get; }
     public ObservableCollection<OfflineSeatOption> Seats { get; } = new();
     public string[] Difficulties { get; } = { "Easy", "Normal", "Hard" };
     public int PlayerCount { get => _playerCount; set { if (Set(ref _playerCount, value is 2 or 4 ? value : 4)) { BuildSeats(); OnPropertyChanged(nameof(IsTwo)); OnPropertyChanged(nameof(IsFour)); } } }
@@ -325,7 +332,7 @@ public sealed class OfflineSetupViewModel : ViewModelBase
         _settings.SetString(SettingKeys.OfflineName, Seats[0].Name);
         var seats = Seats.Select(s => new OfflineSeat(s.Name, s.IsBot, s.Difficulty, s.IsBot ? "knight" : "crown")).ToList();
         _state.LastOfflineSeats = seats;
-        await LaunchAsync(OfflineGameSession.NewGame(seats, new CryptoDiceRoller(), _delay, _settings));
+        await LaunchAsync(OfflineGameSession.NewGame(seats, new CryptoDiceRoller(), _delay, _settings, mode: _state.SelectedMode));
     }
 
     private async Task ResumeAsync()
