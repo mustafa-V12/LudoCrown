@@ -79,7 +79,10 @@ export class BoardRenderer {
             for (let p = e.from + 1; p <= e.to; p++) path.push(piecePosition(player.color, e.piece, p));
             await this.tween(e.seat, e.piece, path, HOP_MS);
           } else if (e.type === 'PieceCaptured') {
+            this.burst(piecePosition(player.color, e.piece, e.from), [of(player.color), '#FFFFFF', Palette.gold], 18);
             await this.tween(e.seat, e.piece, [yardSlot(player.color, e.piece)], CAPTURE_MS);
+          } else if (e.type === 'PieceFinished') {
+            this.burst(piecePosition(player.color, e.piece, 56), [Palette.gold, '#FFE69A', '#FFFFFF'], 16, true);
           }
         }
       } finally {
@@ -215,6 +218,50 @@ export class BoardRenderer {
     ctx.drawImage(this.cache, 0, 0, this.size, this.size);
     this.drawTurnHighlight();
     this.drawPieces();
+    this.drawParticles();
+  }
+
+  private particles: { x: number; y: number; vx: number; vy: number; life: number; color: string; size: number; star: boolean }[] = [];
+  private particleFrame = 0;
+
+  /** A burst of sparks at a grid point (captures and crowned pieces). */
+  burst(at: GridPoint, colors: string[], count: number, star = false): void {
+    if (this.reduceMotion) return;
+    const p = this.toScreen(at);
+    const c = this.cell();
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2, v = (0.04 + Math.random() * 0.09) * c;
+      this.particles.push({ x: p.x, y: p.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - c * 0.03, life: 1, color: colors[i % colors.length], size: c * (0.08 + Math.random() * 0.1), star });
+    }
+    if (!this.particleFrame) {
+      let last = performance.now();
+      const step = (now: number) => {
+        const dt = Math.min(3, (now - last) / 16.7);
+        last = now;
+        for (const q of this.particles) {
+          q.x += q.vx * dt; q.y += q.vy * dt; q.vy += c * 0.004 * dt; q.life -= 0.022 * dt;
+        }
+        this.particles = this.particles.filter((q) => q.life > 0);
+        this.draw();
+        this.particleFrame = this.particles.length ? requestAnimationFrame(step) : 0;
+      };
+      this.particleFrame = requestAnimationFrame(step);
+    }
+  }
+
+  private drawParticles(): void {
+    const ctx = this.ctx;
+    for (const q of this.particles) {
+      ctx.globalAlpha = Math.max(0, q.life);
+      if (q.star) drawStar(ctx, q.x, q.y, q.size * 1.4, Palette.goldDeep, q.color);
+      else {
+        ctx.beginPath();
+        ctx.arc(q.x, q.y, q.size, 0, Math.PI * 2);
+        ctx.fillStyle = q.color;
+        ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
   }
 
   /** Everything that doesn't move, drawn once per size into an offscreen canvas. */
@@ -259,32 +306,40 @@ export class BoardRenderer {
     roundRect(ctx, x + c * 0.08, y + c * 0.08, s - c * 0.16, s - c * 0.16, c * 0.5);
     ctx.fill();
 
-    const inset = c * 0.85;
-    ctx.fillStyle = Palette.ivory;
-    roundRect(ctx, x + inset, y + inset, s - inset * 2, s - inset * 2, c * 0.45);
+    // Darker inner court with a soft inner shadow, like a recessed tray.
+    const inset = c * 0.8;
+    ctx.save();
+    roundRect(ctx, x + inset, y + inset, s - inset * 2, s - inset * 2, c * 0.4);
+    ctx.fillStyle = active ? dark(color) : muted(color, 0.42);
     ctx.fill();
-    ctx.strokeStyle = dark(color, 0.35);
-    ctx.lineWidth = Math.max(1, c * 0.05);
+    ctx.clip();
+    ctx.shadowColor = 'rgba(0,0,0,0.45)';
+    ctx.shadowBlur = c * 0.5;
+    ctx.lineWidth = c * 0.3;
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+    roundRect(ctx, x + inset - c * 0.15, y + inset - c * 0.15, s - inset * 2 + c * 0.3, s - inset * 2 + c * 0.3, c * 0.5);
     ctx.stroke();
+    ctx.restore();
 
     for (let i = 0; i < 4; i++) {
       const p = this.toScreen(yardSlot(color, i));
       ctx.beginPath();
-      ctx.arc(p.x, p.y, c * 0.52, 0, Math.PI * 2);
-      ctx.fillStyle = light(color, active ? 0.55 : 0.3);
+      ctx.arc(p.x, p.y, c * 0.5, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0,0,0,0.22)';
       ctx.fill();
-      ctx.strokeStyle = of(color, active ? 0.8 : 0.3);
+      ctx.strokeStyle = light(color, active ? 0.45 : 0.2);
+      ctx.lineWidth = Math.max(1, c * 0.05);
       ctx.stroke();
     }
   }
 
   private drawTrack(ctx: CanvasRenderingContext2D, c: number): void {
-    ctx.strokeStyle = Palette.line;
-    ctx.lineWidth = Math.max(1, c * 0.04);
+    ctx.strokeStyle = 'rgba(38, 22, 74, 0.55)';
+    ctx.lineWidth = Math.max(1, c * 0.035);
     for (let i = 0; i < TRACK_LENGTH; i++) {
       const cell = this.cellRect(trackCell(i), c);
       const startOf = START_SQUARES.has(i) ? (Math.floor(i / QUARTER_LENGTH) as PlayerColor) : null;
-      ctx.fillStyle = startOf !== null ? of(startOf) : Palette.ivory;
+      ctx.fillStyle = startOf !== null ? of(startOf) : STAR_SQUARES.has(i) ? '#E4DDF0' : '#FFFDF8';
       ctx.fillRect(cell.x, cell.y, c, c);
       ctx.strokeRect(cell.x, cell.y, c, c);
       if (startOf !== null) this.drawArrow(ctx, cell, startOf, c);
@@ -293,7 +348,7 @@ export class BoardRenderer {
     for (const color of ALL_COLORS) {
       for (let step = 0; step < 5; step++) {
         const cell = this.cellRect(homeColumnCell(color, step), c);
-        ctx.fillStyle = homeStep(color, step);
+        ctx.fillStyle = step === 4 ? homeStep(color, 1) : of(color);
         ctx.fillRect(cell.x, cell.y, c, c);
         ctx.strokeRect(cell.x, cell.y, c, c);
       }
@@ -381,7 +436,7 @@ export class BoardRenderer {
       list.forEach((sp, k) => {
         const off = list.length === 1 ? { x: 0, y: 0 } : stackOffset(k, list.length, c);
         const p = this.toScreen(sp.pos);
-        const r = c * (list.length === 1 ? 0.38 : 0.3) * sp.scale;
+        const r = c * (list.length === 1 ? 0.4 : 0.31) * sp.scale;
         this.drawPiece(p.x + off.x, p.y + off.y, r, sp.color, sp.seat === currentSeat && this.legal.has(sp.piece), pulse);
       });
     }
@@ -391,32 +446,40 @@ export class BoardRenderer {
     const ctx = this.ctx;
     if (movable) {
       ctx.beginPath();
-      ctx.arc(x, y, r * (1.45 + 0.15 * pulse), 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(233,185,73,${0.25 + 0.35 * pulse})`;
+      ctx.arc(x, y, r * (1.5 + 0.18 * pulse), 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255,224,122,${0.28 + 0.4 * pulse})`;
       ctx.fill();
     }
-    ctx.save();
-    ctx.shadowColor = 'rgba(0,0,0,0.43)';
-    ctx.shadowBlur = r * 0.35;
-    ctx.shadowOffsetY = r * 0.18;
+    // Coin: drop shadow, thick gold rim, coloured face with a shine, white crown emblem.
+    ctx.beginPath();
+    ctx.ellipse(x, y + r * 0.42, r * 0.95, r * 0.5, 0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.32)';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x, y + r * 0.12, r, 0, Math.PI * 2);
+    ctx.fillStyle = Palette.goldDeep;
+    ctx.fill();
+    const rim = ctx.createLinearGradient(x, y - r, x, y + r);
+    rim.addColorStop(0, '#FFE69A');
+    rim.addColorStop(0.5, Palette.gold);
+    rim.addColorStop(1, Palette.goldDeep);
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fillStyle = dark(color);
+    ctx.fillStyle = rim;
     ctx.fill();
-    ctx.restore();
-
-    const g = ctx.createRadialGradient(x - r * 0.3, y - r * 0.35, r * 0.05, x, y, r * 0.95);
+    const g = ctx.createRadialGradient(x - r * 0.25, y - r * 0.3, r * 0.05, x, y, r * 0.8);
     g.addColorStop(0, light(color));
-    g.addColorStop(1, of(color));
+    g.addColorStop(0.55, of(color));
+    g.addColorStop(1, dark(color));
     ctx.beginPath();
-    ctx.arc(x, y, r * 0.86, 0, Math.PI * 2);
+    ctx.arc(x, y, r * 0.76, 0, Math.PI * 2);
     ctx.fillStyle = g;
     ctx.fill();
-    ctx.strokeStyle = Palette.ivory;
-    ctx.lineWidth = Math.max(1.2, r * 0.14);
-    ctx.stroke();
-
-    drawCrown(ctx, x, y + r * 0.04, r * 0.82);
+    drawEmblem(ctx, x, y + r * 0.05, r * 0.82);
+    ctx.beginPath();
+    ctx.ellipse(x - r * 0.18, y - r * 0.42, r * 0.38, r * 0.16, -0.3, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.fill();
 
     if (movable) {
       ctx.beginPath();
@@ -469,6 +532,23 @@ export function drawCrown(ctx: CanvasRenderingContext2D, cx: number, cy: number,
   ctx.beginPath();
   ctx.arc(cx, y + h * 0.66, size * 0.07, 0, Math.PI * 2);
   ctx.fillStyle = '#D7263D';
+  ctx.fill();
+}
+
+/** The white crown emblem stamped on each piece. */
+function drawEmblem(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number): void {
+  const w = size * 0.78, hgt = w * 0.62;
+  const x = cx - w / 2, y = cy - hgt / 2;
+  ctx.beginPath();
+  ctx.moveTo(x + w * 0.1, y + hgt);
+  ctx.lineTo(x, y + hgt * 0.2);
+  ctx.lineTo(x + w * 0.3, y + hgt * 0.52);
+  ctx.lineTo(x + w * 0.5, y);
+  ctx.lineTo(x + w * 0.7, y + hgt * 0.52);
+  ctx.lineTo(x + w, y + hgt * 0.2);
+  ctx.lineTo(x + w * 0.9, y + hgt);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(255,253,248,0.95)';
   ctx.fill();
 }
 

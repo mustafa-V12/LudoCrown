@@ -11,9 +11,14 @@
     "test": "vitest run"
   },
   "devDependencies": {
+    "@types/canvas-confetti": "^1.9.0",
     "@types/node": "^22.18.12",
     "typescript": "^5.9.3",
     "vite": "^7.1.12",
     "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "@fontsource/baloo-2": "^5.3.0",
+    "canvas-confetti": "^1.9.4"
   }
 }

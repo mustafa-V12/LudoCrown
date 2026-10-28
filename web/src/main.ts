@@ -1,3 +1,6 @@
+import '@fontsource/baloo-2/600.css';
+import '@fontsource/baloo-2/700.css';
+import '@fontsource/baloo-2/800.css';
 import './styles.css';
 import { App } from './ui/app';
 

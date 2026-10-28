@@ -9,6 +9,8 @@ export interface SeatConfig {
   name: string;
   bot: boolean;
   difficulty: BotDifficulty;
+  /** Avatar id (see ui/avatars.ts). */
+  avatar?: string;
 }
 
 export interface GameView {
@@ -228,6 +230,7 @@ function isValidSave(d: SavedGame): boolean {
       Array.isArray(p.pieces) &&
       p.pieces.length === 4 &&
       p.pieces.every((x) => Number.isInteger(x) && x >= YARD && x <= FINISHED_PROGRESS) &&
-      typeof d.seats[i]?.name === 'string',
+      typeof d.seats[i]?.name === 'string' &&
+      (d.seats[i].avatar === undefined || typeof d.seats[i].avatar === 'string'),
   );
 }

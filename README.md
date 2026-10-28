@@ -20,6 +20,14 @@ A polished, social Ludo game for iPhone, built with **.NET MAUI (C#)**, an **aut
 
 > **Status at a glance:** see [HANDOFF.md](HANDOFF.md) for exactly what is implemented, what was verified (and how), and what still needs your accounts, credentials or a Mac.
 
+## Web version (play in Safari)
+
+<https://mustafa-v12.github.io/LudoCrown/> — offline against the computer or pass-and-play, Classic and Quick, same rules engine as the app.
+
+| | | | |
+|---|---|---|---|
+| ![Lobby with 2 and 4 player tiles](docs/screenshots/web-01-lobby.jpg) | ![Choosing Classic or Quick and the difficulty](docs/screenshots/web-02-mode.jpg) | ![Four-player game with avatars in the corners](docs/screenshots/web-03-game.jpg) | ![Victory screen with confetti](docs/screenshots/web-04-victory.jpg) |
+
 ## Screenshots
 
 Taken from the Windows build running against the local development server. The iPhone build uses the same screens.
