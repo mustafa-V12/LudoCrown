@@ -13,3 +13,6 @@ appsettings.*.local.json
 .env
 secrets/
 node_modules/
+# Local logs written by the Windows helper scripts, and git bundles used for transfers
+tools/windows/*.txt
+*.bundle
