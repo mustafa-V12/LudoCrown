@@ -16,6 +16,8 @@ A polished, social Ludo game for iPhone, built with **.NET MAUI (C#)**, an **aut
 - Profiles, avatars, levels, statistics, match history, friends (by friend code), blocking and reporting
 - Account deletion and a data download built into the app
 
+> **Try it in your browser:** <https://mustafa-v12.github.io/LudoCrown/> — the web version (offline vs computer or pass-and-play, same rules engine). Works on iPhone without installing anything; see [web/README.md](web/README.md).
+
 > **Status at a glance:** see [HANDOFF.md](HANDOFF.md) for exactly what is implemented, what was verified (and how), and what still needs your accounts, credentials or a Mac.
 
 ## Screenshots
@@ -55,6 +57,7 @@ src/
   LudoCrown.Server/          ASP.NET Core server: auth, REST API, SignalR hub, matches, matchmaking, private rooms
   LudoCrown.Server.Data/     Persistence contracts + in-memory development store
   LudoCrown.Server.Postgres/ PostgreSQL store (Npgsql), migration runner, maintenance job
+web/                         Browser version (TypeScript + Vite), published to GitHub Pages
 tests/
   LudoCrown.Core.Tests/      Rules, geometry, AI, protocol, saved-game validation
   LudoCrown.Server.Tests/    Anti-cheat, timers, reconnection, matchmaking, rooms, tokens, ID tokens, email codes

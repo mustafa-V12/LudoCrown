@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Writes engine traces (actions, resulting states, events, legal moves and bot scores) from the C# rules engine.
+    The web version's tests replay them to prove its TypeScript port behaves identically.
+      Run: dotnet run (project tools/LudoCrown.TraceGen) with the output path as argument, see web/README.md
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\LudoCrown.Core\LudoCrown.Core.csproj" />
+  </ItemGroup>
+</Project>
