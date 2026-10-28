@@ -24,7 +24,7 @@ def expand(text):
     # Resolve {ConstName} interpolation used in $"..." strings.
     return re.sub(r"\{(\w+)\}", lambda mm: consts.get(mm.group(1), mm.group(0)), text)
 
-skip = {"ProfileColumns", "CreateMigrationsTable"}
+skip = {"CreateMigrationsTable"} | {k for k in consts if k.endswith("Columns")}
 # The migration runner creates its own bookkeeping table first; do the same here.
 subprocess.run(["psql", db, "-q", "-X", "-c", consts["CreateMigrationsTable"]], check=True)
 failures = 0

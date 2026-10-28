@@ -122,6 +122,9 @@ public static class PostgresServiceCollectionExtensions
         services.AddSingleton<IMatchStore>(sp => sp.GetRequiredService<PostgresStore>());
         services.AddSingleton<ISocialStore>(sp => sp.GetRequiredService<PostgresStore>());
         services.AddSingleton<IWalletStore>(sp => sp.GetRequiredService<PostgresStore>());
+        services.AddSingleton<IEconomyStore>(sp => sp.GetRequiredService<PostgresStore>());
+        services.AddSingleton<IPurchaseStore>(sp => sp.GetRequiredService<PostgresStore>());
+        services.AddSingleton<ILeagueStore>(sp => sp.GetRequiredService<PostgresStore>());
         services.AddSingleton<MigrationRunner>();
         services.AddHostedService<PostgresMaintenanceService>();
         services.AddHealthChecks().AddCheck<PostgresHealthCheck>("postgres");

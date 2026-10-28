@@ -8,7 +8,15 @@ using System.Text.RegularExpressions;
 
 namespace Npgsql;
 
-public sealed class NpgsqlException(string message) : DbException(message);
+public sealed class NpgsqlException(string message) : DbException(message)
+{
+    /// <summary>Approximates PostgreSQL SQLSTATE from psql's error text (enough for the store's error handling).</summary>
+    public override string? SqlState =>
+        message.Contains("violates check constraint") ? "23514"
+        : message.Contains("duplicate key value") ? "23505"
+        : message.Contains("violates foreign key constraint") ? "23503"
+        : null;
+}
 
 public sealed class NpgsqlDataSource : IDisposable, IAsyncDisposable
 {
@@ -99,6 +107,8 @@ public sealed partial class NpgsqlCommand(string sql, NpgsqlConnection connectio
         DateTimeOffset d => $"'{d.ToUniversalTime():yyyy-MM-ddTHH:mm:ss.ffffff}+00:00'",
         byte[] bytes => $"'\\x{Convert.ToHexString(bytes)}'",
         Guid[] arr => "'{" + string.Join(",", arr) + "}'",
+        string[] arr => arr.Length == 0 ? "'{}'" : "ARRAY[" + string.Join(",", arr.Select(a => Literal(a))) + "]",
+        int[] arr => arr.Length == 0 ? "'{}'" : "ARRAY[" + string.Join(",", arr.Select(a => Literal(a))) + "]",
         _ => throw new NotSupportedException($"Stub cannot bind {v.GetType()}"),
     };
 

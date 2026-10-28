@@ -7,7 +7,7 @@ namespace LudoCrown.Server.Postgres;
 /// Production store. All statements come from <see cref="Sql"/>. Multi-step writes (account creation,
 /// match completion, friend requests) run in a single transaction so data stays consistent.
 /// </summary>
-public sealed class PostgresStore(NpgsqlDataSource db, TimeProvider time) : IAccountStore, IProfileStore, IMatchStore, ISocialStore, IWalletStore
+public sealed partial class PostgresStore(NpgsqlDataSource db, TimeProvider time) : IAccountStore, IProfileStore, IMatchStore, ISocialStore, IWalletStore, IEconomyStore, IPurchaseStore, ILeagueStore
 {
     // ---------------- helpers ----------------
 
@@ -56,7 +56,7 @@ public sealed class PostgresStore(NpgsqlDataSource db, TimeProvider time) : IAcc
     private static DateTimeOffset Time(NpgsqlDataReader r, int i) => r.GetFieldValue<DateTimeOffset>(i);
 
     private static UserRecord MapUser(NpgsqlDataReader r) => new(r.GetGuid(0), r.GetBoolean(1), Time(r, 2));
-    private static ProfileRecord MapProfile(NpgsqlDataReader r) => new(r.GetGuid(0), r.GetString(1), r.GetString(2), r.GetString(3).Trim(), r.GetInt32(4), Time(r, 5));
+    private static ProfileRecord MapProfile(NpgsqlDataReader r) => new(r.GetGuid(0), r.GetString(1), r.GetString(2), r.GetString(3).Trim(), r.GetInt32(4), Time(r, 5), NullableString(r, 6));
     private static AuthCodeRecord MapCode(NpgsqlDataReader r) => new(r.GetGuid(0), r.GetString(1), r.GetFieldValue<byte[]>(2), NullableGuid(r, 3), NullableString(r, 4), Time(r, 5), r.GetInt32(6));
     private static RefreshTokenRecord MapRefresh(NpgsqlDataReader r) => new(r.GetGuid(0), r.GetGuid(1), r.GetFieldValue<byte[]>(2), Time(r, 3), Time(r, 4), NullableTime(r, 5), NullableGuid(r, 6));
 
@@ -87,6 +87,7 @@ public sealed class PostgresStore(NpgsqlDataSource db, TimeProvider time) : IAcc
         await using (var c = Cmd(conn, tx, Sql.InsertStats, user.Id)) await c.ExecuteNonQueryAsync(ct);
         await using (var c = Cmd(conn, tx, Sql.InsertWallet, user.Id, (long)Economy.StarterGems)) await c.ExecuteNonQueryAsync(ct);
         await using (var c = Cmd(conn, tx, Sql.InsertGemLedger, user.Id, (long)Economy.StarterGems, Economy.Reasons.StarterGrant, null, "starter")) await c.ExecuteNonQueryAsync(ct);
+        await using (var c = Cmd(conn, tx, Sql.InsertProfileSettings, user.Id)) await c.ExecuteNonQueryAsync(ct);
         await tx.CommitAsync(ct);
         return user;
     }
@@ -119,6 +120,7 @@ public sealed class PostgresStore(NpgsqlDataSource db, TimeProvider time) : IAcc
         // and user_id is set NULL by the foreign key when the user row is deleted.
         await using (var c = Cmd(conn, tx, Sql.AnonymiseParticipants, userId)) await c.ExecuteNonQueryAsync(ct);
         await using (var c = Cmd(conn, tx, Sql.DeleteReportsBy, userId)) await c.ExecuteNonQueryAsync(ct);
+        await using (var c = Cmd(conn, tx, Sql.ReleaseGroupSeatsOfUser, userId)) await c.ExecuteNonQueryAsync(ct);
         await using (var c = Cmd(conn, tx, Sql.DeleteUser, userId)) await c.ExecuteNonQueryAsync(ct);
         await tx.CommitAsync(ct);
     }
@@ -209,12 +211,17 @@ public sealed class PostgresStore(NpgsqlDataSource db, TimeProvider time) : IAcc
         foreach (var o in c.Outcomes)
         {
             await using (var cmd = Cmd(conn, tx, Sql.RecordParticipantResult, c.MatchId, o.Seat, o.Placement, ResultText(o.Result), o.CoinsAwarded, o.XpAwarded, o.PiecesCaptured,
-                o.RerollsUsed, o.GemsAwarded))
+                o.RerollsUsed, o.GemsAwarded, o.BoostsUsed, o.LeaguePoints))
                 await cmd.ExecuteNonQueryAsync(ct);
             if (o.UserId is not Guid uid) continue;
 
             await using (var cmd = Cmd(conn, tx, Sql.ApplyStats, uid, o.Result == ParticipantResult.Win, c.PlayerCount, o.PiecesCaptured, o.Result == ParticipantResult.Abandoned))
                 await cmd.ExecuteNonQueryAsync(ct);
+            await using (var cmd = Cmd(conn, tx, Sql.ApplyModeStats, uid, GameModeText(c.GameMode), o.Result == ParticipantResult.Win, o.Result == ParticipantResult.Loss, o.Result == ParticipantResult.Abandoned))
+                await cmd.ExecuteNonQueryAsync(ct);
+            if (c.LeagueSeasonId is int seasonId && o.LeaguePoints is int points)
+                await using (var cmd = Cmd(conn, tx, Sql.ApplyLeaguePoints, seasonId, uid, points, o.Result == ParticipantResult.Win, c.EndedAt))
+                    await cmd.ExecuteNonQueryAsync(ct);
             if (o.XpAwarded > 0)
                 await using (var cmd = Cmd(conn, tx, Sql.AddXp, uid, o.XpAwarded)) await cmd.ExecuteNonQueryAsync(ct);
             if (o.CoinsAwarded > 0)
@@ -244,11 +251,11 @@ public sealed class PostgresStore(NpgsqlDataSource db, TimeProvider time) : IAcc
             m.Json)).ToList();
     }
 
-    public async Task<IReadOnlyList<MatchHistoryItem>> GetHistoryAsync(Guid userId, int limit, CancellationToken ct = default) =>
+    public async Task<IReadOnlyList<MatchHistoryItem>> GetHistoryAsync(Guid userId, int limit, DateTimeOffset? before = null, CancellationToken ct = default) =>
         await QueryAsync(Sql.GetHistory, r => new MatchHistoryItem(
             r.GetGuid(0), ParseMode(r.GetString(1)), r.GetInt16(2), Time(r, 3), NullableTime(r, 4),
             r.IsDBNull(5) ? 0 : r.GetInt16(5), ParseResult(r.GetString(6)), r.GetInt32(7), r.GetInt32(8),
-            r.GetFieldValue<string[]>(9), ParseGameMode(r.GetString(10)), r.GetInt16(11), r.GetInt32(12)), ct, userId, limit);
+            r.GetFieldValue<string[]>(9), ParseGameMode(r.GetString(10)), r.GetInt16(11), r.GetInt32(12), r.IsDBNull(13) ? null : r.GetInt16(13)), ct, userId, limit, before);
 
     // ---------------- gems ----------------
 
@@ -308,7 +315,7 @@ public sealed class PostgresStore(NpgsqlDataSource db, TimeProvider time) : IAcc
         {
             var status = r.GetString(4) == "accepted" ? FriendshipStatus.Accepted : FriendshipStatus.Pending;
             return new FriendRecord(r.GetGuid(0), r.GetString(1), r.GetString(2), Progression.LevelForXp(r.GetInt32(3)), status,
-                status == FriendshipStatus.Pending && r.GetGuid(5) != userId);
+                status == FriendshipStatus.Pending && r.GetGuid(5) != userId, r.GetString(6).Trim());
         }, ct, userId);
 
     public async Task<FriendshipStatus> RequestFriendAsync(Guid fromUser, Guid toUser, DateTimeOffset at, CancellationToken ct = default)
