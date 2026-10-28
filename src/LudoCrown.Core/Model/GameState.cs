@@ -14,6 +14,13 @@ public sealed class PlayerState
     public int[] Pieces { get; set; } = Enumerable.Repeat(BoardGeometry.Yard, BoardGeometry.PiecesPerPlayer).ToArray();
     /// <summary>Gem rerolls this player has used in this match (limited by <see cref="RuleSet.MaxRerolls"/>).</summary>
     public int RerollsUsed { get; set; }
+    /// <summary>Boost bottles this player has used in this match (limited by <see cref="RuleSet.MaxBoosts"/>).</summary>
+    public int BoostsUsed { get; set; }
+    /// <summary>
+    /// Shield bottle active: this player's pieces cannot be captured. Set when the player drinks a Shield at the start
+    /// of their turn; cleared automatically when their next turn begins (see <see cref="Engine.GameEngine.UseShield"/>).
+    /// </summary>
+    public bool ShieldActive { get; set; }
 
     public bool HasFinished => Pieces.All(p => p == BoardGeometry.FinishedProgress);
     public int FinishedCount => Pieces.Count(p => p == BoardGeometry.FinishedProgress);
@@ -29,6 +36,8 @@ public sealed class PlayerState
         PlayerId = PlayerId,
         Pieces = (int[])Pieces.Clone(),
         RerollsUsed = RerollsUsed,
+        BoostsUsed = BoostsUsed,
+        ShieldActive = ShieldActive,
     };
 }
 
@@ -64,6 +73,8 @@ public sealed class GameState
     public bool HasWon(PlayerState p) => p.FinishedCount >= Rules.PiecesToWin;
 
     public int RerollsRemaining(PlayerState p) => Math.Max(0, Rules.MaxRerolls - p.RerollsUsed);
+
+    public int BoostsRemaining(PlayerState p) => Math.Max(0, Rules.MaxBoosts - p.BoostsUsed);
 
     public PlayerState? PlayerBySeat(int seat) => Players.FirstOrDefault(p => p.Seat == seat);
 

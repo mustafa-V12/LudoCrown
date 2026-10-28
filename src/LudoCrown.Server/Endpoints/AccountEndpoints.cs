@@ -38,8 +38,9 @@ public static class AccountEndpoints
         me.MapGet("/gems", async (HttpContext http, IWalletStore wallet, CancellationToken ct) =>
             Results.Ok(new GemBalanceResponse(await wallet.GetGemsAsync(http.User.UserId(), ct))));
 
-        me.MapGet("/matches", async (int? limit, HttpContext http, IMatchStore matches, CancellationToken ct) =>
-            Results.Ok(await matches.GetHistoryAsync(http.User.UserId(), Math.Clamp(limit ?? 30, 1, 100), ct)));
+        // Paged: pass the StartedAt of the last item as ?before= to get the next page. At most 50 per page.
+        me.MapGet("/matches", async (int? limit, DateTimeOffset? before, HttpContext http, IMatchStore matches, CancellationToken ct) =>
+            Results.Ok(await matches.GetHistoryAsync(http.User.UserId(), Math.Clamp(limit ?? 20, 1, 50), before, ct)));
 
         me.MapGet("/export", async (HttpContext http, AccountService accounts, CancellationToken ct) =>
         {
@@ -115,24 +116,27 @@ public static class AccountEndpoints
             return Results.NoContent();
         });
 
-        app.MapPost("/reports", async (ReportRequest req, HttpContext http, ISocialStore social, IAccountStore accounts, TimeProvider time, CancellationToken ct) =>
+        app.MapPost("/reports", async (ReportRequest req, HttpContext http, ISocialStore social, IAccountStore accounts, IProfileStore profiles, TimeProvider time, CancellationToken ct) =>
         {
             var id = http.User.UserId();
             if (!ReportReasons.All.Contains(req.Reason)) return AuthEndpoints.Error(StatusCodes.Status400BadRequest, "invalid_reason", "Choose a reason.");
-            if (req.UserId == id || await accounts.GetUserAsync(req.UserId, ct) is null) return Results.NotFound();
+            // Players are identified by public id (friend code) in the app; the internal id is still accepted for older clients.
+            Guid? target = req.PublicId is { Length: 8 } code ? (await profiles.GetProfileByFriendCodeAsync(code.ToUpperInvariant(), ct))?.UserId : req.UserId;
+            if (target is not Guid reported || reported == id || await accounts.GetUserAsync(reported, ct) is null) return Results.NotFound();
             var details = req.Details?.Trim();
             if (details is { Length: > 500 }) details = details[..500];
-            await social.AddReportAsync(new ReportRecord(Guid.NewGuid(), id, req.UserId, req.MatchId, req.Reason, details, time.GetUtcNow()), ct);
+            await social.AddReportAsync(new ReportRecord(Guid.NewGuid(), id, reported, req.MatchId, req.Reason, details, time.GetUtcNow()), ct);
             return Results.Accepted();
         }).RequireAuthorization().RequireRateLimiting("api");
 
-        app.MapGet("/players/{userId:guid}", async (Guid userId, HttpContext http, IProfileStore profiles, ISocialStore social, CancellationToken ct) =>
+        // Block / unblock by public id (from a profile card at the table, in results, or in a league table).
+        app.MapPost("/players/{publicId}/block", async (string publicId, HttpContext http, IProfileStore profiles, ISocialStore social, TimeProvider time, CancellationToken ct) =>
         {
-            if (await social.IsBlockedEitherWayAsync(http.User.UserId(), userId, ct)) return Results.NotFound();
-            var p = await profiles.GetProfileAsync(userId, ct);
-            if (p is null) return Results.NotFound();
-            var s = await profiles.GetStatsAsync(userId, ct);
-            return Results.Ok(new PublicProfileResponse(p.UserId, p.DisplayName, p.AvatarId, p.Level, s.GamesPlayed, s.GamesWon));
+            var id = http.User.UserId();
+            var p = await profiles.GetProfileByFriendCodeAsync(publicId.Trim().ToUpperInvariant(), ct);
+            if (p is null || p.UserId == id) return Results.NotFound();
+            await social.BlockAsync(id, p.UserId, time.GetUtcNow(), ct);
+            return Results.NoContent();
         }).RequireAuthorization().RequireRateLimiting("api");
     }
 

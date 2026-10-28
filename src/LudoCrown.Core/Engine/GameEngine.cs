@@ -128,6 +128,34 @@ public static class GameEngine
         return moves;
     }
 
+    /// <summary>
+    /// Shield bottle. Exact effect: from now until the start of this player's next turn, none of their pieces can be
+    /// captured — an opponent landing on a shielded piece simply shares the square, as on a safe square. Usable only on
+    /// your own turn before rolling, once per match (<see cref="RuleSet.MaxBoosts"/>), and only when the match allows boosts.
+    /// It changes no dice, no movement and no turn order, so it can never decide a game by itself.
+    /// </summary>
+    public static EngineResult UseShield(GameState state, int seat)
+    {
+        var error = ValidateShield(state, seat);
+        if (error != ErrorCode.None) return EngineResult.Fail(state, error);
+        var next = state.Clone();
+        var player = next.CurrentPlayer;
+        player.ShieldActive = true;
+        player.BoostsUsed++;
+        return Done(next, new List<GameEvent> { new(GameEventType.ShieldActivated, seat, Value: player.BoostsUsed) });
+    }
+
+    public static ErrorCode ValidateShield(GameState state, int seat)
+    {
+        if (state.Phase == GamePhase.Finished) return ErrorCode.GameOver;
+        if (state.CurrentPlayer.Seat != seat) return ErrorCode.NotYourTurn;
+        if (state.Rules.MaxBoosts <= 0) return ErrorCode.BoostNotAllowed;
+        var player = state.CurrentPlayer;
+        if (player.BoostsUsed >= state.Rules.MaxBoosts) return ErrorCode.NoBoostsLeft;
+        if (state.Phase != GamePhase.AwaitingRoll || player.ShieldActive) return ErrorCode.BoostNotAllowed;
+        return ErrorCode.None;
+    }
+
     /// <summary>Moves piece <paramref name="pieceIndex"/> of <paramref name="seat"/> by the pending roll.</summary>
     public static EngineResult Move(GameState state, int seat, int pieceIndex)
     {
@@ -161,6 +189,11 @@ public static class GameEngine
                         var p = other.Pieces[j];
                         if (BoardGeometry.IsOnMainTrack(p) && BoardGeometry.AbsoluteIndex(other.Color, p) == abs)
                         {
+                            if (other.ShieldActive)
+                            {
+                                events.Add(new GameEvent(GameEventType.CaptureBlockedByShield, other.Seat, j, p, p, player.Seat));
+                                continue;
+                            }
                             other.Pieces[j] = BoardGeometry.Yard;
                             captured = true;
                             events.Add(new GameEvent(GameEventType.PieceCaptured, other.Seat, j, p, BoardGeometry.Yard, player.Seat));
@@ -241,7 +274,7 @@ public static class GameEngine
         if (!BoardGeometry.IsOnMainTrack(to)) return false;
         var abs = BoardGeometry.AbsoluteIndex(player.Color, to);
         if (BoardGeometry.IsSafeSquare(abs)) return false;
-        return state.Players.Where(p => p.Seat != player.Seat)
+        return state.Players.Where(p => p.Seat != player.Seat && !p.ShieldActive)
             .Any(o => o.Pieces.Any(p => BoardGeometry.IsOnMainTrack(p) && BoardGeometry.AbsoluteIndex(o.Color, p) == abs));
     }
 
@@ -271,6 +304,12 @@ public static class GameEngine
         }
         next.TurnNumber++;
         events.Add(new GameEvent(GameEventType.TurnPassed, from, Value: next.CurrentPlayer.Seat));
+        if (next.CurrentPlayer.ShieldActive)
+        {
+            // The shield lasts until its owner's next turn begins.
+            next.CurrentPlayer.ShieldActive = false;
+            events.Add(new GameEvent(GameEventType.ShieldExpired, next.CurrentPlayer.Seat));
+        }
     }
 
     private static EngineResult Done(GameState next, List<GameEvent> events)

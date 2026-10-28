@@ -16,7 +16,8 @@ public sealed record UserRecord(Guid Id, bool IsGuest, DateTimeOffset CreatedAt)
 /// <summary>A sign-in method linked to an account. Subject is the provider's stable user id (never a password).</summary>
 public sealed record IdentityRecord(Guid UserId, string Provider, string Subject, string? Email, DateTimeOffset CreatedAt);
 
-public sealed record ProfileRecord(Guid UserId, string DisplayName, string AvatarId, string FriendCode, int Xp, DateTimeOffset UpdatedAt)
+/// <summary><see cref="FrameId"/> is the equipped avatar frame (a cosmetic the player owns), or null.</summary>
+public sealed record ProfileRecord(Guid UserId, string DisplayName, string AvatarId, string FriendCode, int Xp, DateTimeOffset UpdatedAt, string? FrameId = null)
 {
     public int Level => Progression.LevelForXp(Xp);
 }
@@ -39,7 +40,8 @@ public static class AuthCodeKinds
 /// <summary>Short-lived single-use secret (email code, OAuth state, login hand-off). Only the hash is stored.</summary>
 public sealed record AuthCodeRecord(Guid Id, string Kind, byte[] CodeHash, Guid? UserId, string? Payload, DateTimeOffset ExpiresAt, int Attempts);
 
-public enum MatchMode { Matchmaking, Private, }
+/// <summary>How a match was formed. Matchmaking = ranked queue (league points, no boosts); Casual = casual queue (boosts, no league); Private = private table (boosts, no league, no coins).</summary>
+public enum MatchMode { Matchmaking, Private, Casual }
 public enum MatchStatus { Active, Completed, Abandoned }
 public enum ParticipantResult { Win, Loss, Abandoned }
 
@@ -48,19 +50,25 @@ public sealed record MatchParticipantRecord(int Seat, Guid? UserId, bool IsBot, 
 public sealed record MatchRecord(Guid Id, MatchMode Mode, int PlayerCount, string? RoomCode, DateTimeOffset StartedAt, IReadOnlyList<MatchParticipantRecord> Participants,
     LudoCrown.Core.Model.GameMode GameMode = LudoCrown.Core.Model.GameMode.Classic);
 
+/// <summary><see cref="LeaguePoints"/> is null when the match does not count for the league.</summary>
 public sealed record ParticipantOutcome(int Seat, Guid? UserId, int Placement, ParticipantResult Result, int CoinsAwarded, int XpAwarded, int PiecesCaptured,
-    int GemsAwarded = 0, int RerollsUsed = 0);
+    int GemsAwarded = 0, int RerollsUsed = 0, int BoostsUsed = 0, int? LeaguePoints = null);
 
-public sealed record MatchCompletion(Guid MatchId, MatchStatus Status, DateTimeOffset EndedAt, Guid? WinnerUserId, string FinalStateJson, IReadOnlyList<ParticipantOutcome> Outcomes, int PlayerCount);
+/// <summary>
+/// The authoritative result. <see cref="GameMode"/> drives per-mode stats; <see cref="LeagueSeasonId"/> (set only for ranked
+/// matches with 2+ humans) says which season standings receive the outcomes' league points.
+/// </summary>
+public sealed record MatchCompletion(Guid MatchId, MatchStatus Status, DateTimeOffset EndedAt, Guid? WinnerUserId, string FinalStateJson, IReadOnlyList<ParticipantOutcome> Outcomes, int PlayerCount,
+    LudoCrown.Core.Model.GameMode GameMode = LudoCrown.Core.Model.GameMode.Classic, int? LeagueSeasonId = null);
 
 public sealed record ActiveMatchRecord(MatchRecord Match, string StateJson);
 
 public sealed record MatchHistoryItem(Guid MatchId, MatchMode Mode, int PlayerCount, DateTimeOffset StartedAt, DateTimeOffset? EndedAt, int Placement, ParticipantResult Result, int CoinsAwarded, int XpAwarded, IReadOnlyList<string> Opponents,
-    LudoCrown.Core.Model.GameMode GameMode = LudoCrown.Core.Model.GameMode.Classic, int RerollsUsed = 0, int GemsAwarded = 0);
+    LudoCrown.Core.Model.GameMode GameMode = LudoCrown.Core.Model.GameMode.Classic, int RerollsUsed = 0, int GemsAwarded = 0, int? LeaguePoints = null);
 
 public enum FriendshipStatus { Pending, Accepted }
 
-public sealed record FriendRecord(Guid UserId, string DisplayName, string AvatarId, int Level, FriendshipStatus Status, bool IncomingRequest);
+public sealed record FriendRecord(Guid UserId, string DisplayName, string AvatarId, int Level, FriendshipStatus Status, bool IncomingRequest, string FriendCode = "");
 
 public static class ReportReasons
 {
@@ -69,34 +77,9 @@ public static class ReportReasons
 
 public sealed record ReportRecord(Guid Id, Guid ReporterId, Guid ReportedId, Guid? MatchId, string Reason, string? Details, DateTimeOffset CreatedAt);
 
-public sealed record AccountExport(UserRecord User, IReadOnlyList<IdentityRecord> Identities, ProfileRecord? Profile, StatsRecord Stats, long Coins, IReadOnlyList<MatchHistoryItem> Matches, IReadOnlyList<FriendRecord> Friends, IReadOnlyList<Guid> Blocked);
-
-/// <summary>
-/// Gem economy. Gems are earned (starter grant, online wins) and spent on rerolls. There are no real-money
-/// purchases. Balances live only in the server database; clients can never write them.
-/// </summary>
-public static class Economy
-{
-    public const int StarterGems = 10;
-    public const int MaxDevGrant = 100;
-
-    public static class Reasons
-    {
-        public const string MatchReward = "match_reward";
-        public const string Reroll = "reroll";
-        public const string StarterGrant = "starter_grant";
-        public const string DevGrant = "dev_grant";
-        public const string AdminAdjustment = "admin_adjustment";
-    }
-}
-
-public enum GemSpendOutcome { Spent, AlreadySpent, InsufficientGems, UnknownUser }
-
-/// <summary>Result of an idempotent gem spend. <see cref="Balance"/> is the balance after the operation.</summary>
-public sealed record GemSpendResult(GemSpendOutcome Outcome, long Balance)
-{
-    public bool Charged => Outcome is GemSpendOutcome.Spent or GemSpendOutcome.AlreadySpent;
-}
+public sealed record AccountExport(UserRecord User, IReadOnlyList<IdentityRecord> Identities, ProfileRecord? Profile, StatsRecord Stats, long Coins, IReadOnlyList<MatchHistoryItem> Matches, IReadOnlyList<FriendRecord> Friends, IReadOnlyList<Guid> Blocked,
+    long Gems = 0, IReadOnlyDictionary<string, int>? Inventory = null, IReadOnlyList<LedgerEntry>? Ledger = null, IReadOnlyList<PurchaseRecord>? Purchases = null,
+    PrivacySettings? Privacy = null, IReadOnlyList<ModeStatsRecord>? ModeStats = null);
 
 public static class Progression
 {

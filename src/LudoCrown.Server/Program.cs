@@ -7,6 +7,8 @@ using LudoCrown.Server.Auth;
 using LudoCrown.Server.Data;
 using LudoCrown.Server.Endpoints;
 using LudoCrown.Server.Hubs;
+using LudoCrown.Server.League;
+using LudoCrown.Server.Store;
 using LudoCrown.Server.Matches;
 using LudoCrown.Server.Options;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -21,6 +23,8 @@ var config = builder.Configuration;
 builder.Services.Configure<JwtOptions>(config.GetSection("Jwt"));
 builder.Services.Configure<AuthOptions>(config.GetSection("Auth"));
 builder.Services.Configure<MatchOptions>(config.GetSection("Match"));
+builder.Services.Configure<StoreOptions>(config.GetSection("Store"));
+builder.Services.Configure<LeagueOptions>(config.GetSection("League"));
 
 if (string.IsNullOrWhiteSpace(config["Jwt:SigningKey"]))
 {
@@ -34,6 +38,7 @@ if (string.IsNullOrWhiteSpace(config["Jwt:SigningKey"]))
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<IDiceRoller, CryptoDiceRoller>();
 builder.Services.AddHttpClient("idp", c => c.Timeout = TimeSpan.FromSeconds(10));
+builder.Services.AddHttpClient("appstore", c => c.Timeout = TimeSpan.FromSeconds(15));
 
 // ---------- persistence ----------
 var connectionString = config.GetConnectionString("Postgres");
@@ -59,7 +64,21 @@ else
     builder.Services.AddSingleton<IMatchStore>(sp => sp.GetRequiredService<InMemoryStore>());
     builder.Services.AddSingleton<ISocialStore>(sp => sp.GetRequiredService<InMemoryStore>());
     builder.Services.AddSingleton<IWalletStore>(sp => sp.GetRequiredService<InMemoryStore>());
+    builder.Services.AddSingleton<IEconomyStore>(sp => sp.GetRequiredService<InMemoryStore>());
+    builder.Services.AddSingleton<IPurchaseStore>(sp => sp.GetRequiredService<InMemoryStore>());
+    builder.Services.AddSingleton<ILeagueStore>(sp => sp.GetRequiredService<InMemoryStore>());
 }
+
+// ---------- store & purchases ----------
+builder.Services.AddSingleton<AppStoreVerifier>();
+builder.Services.AddSingleton<IPurchaseVerifier>(sp => sp.GetRequiredService<AppStoreVerifier>());
+var devSandboxStore = builder.Environment.IsDevelopment() && config.GetValue("Store:DevSandbox", false);
+if (devSandboxStore) builder.Services.AddSingleton<IPurchaseVerifier, DevSandboxVerifier>(); // never registered outside Development
+builder.Services.AddSingleton<PurchaseService>();
+
+// ---------- league ----------
+builder.Services.AddSingleton<LeagueService>();
+builder.Services.AddHostedService<LeagueHostedService>();
 
 // ---------- auth ----------
 builder.Services.AddSingleton<TokenService>();
@@ -131,17 +150,26 @@ app.MapGet("/info", (IConfiguration c) => Results.Ok(new
     modes = LudoCrown.Core.Model.GameModes.All.Select(m => new { m.Id, m.Name, m.WinCondition, m.MaxRerolls, m.PiecesToWin }),
     rerollGemCost = LudoCrown.Core.Model.GameModes.RerollGemCost,
     devGemGrant = app.Environment.IsDevelopment() && c.GetValue("DevTools:AllowGemGrant", false),
+    devSandboxStore = devSandboxStore,
+    appStoreVerification = app.Services.GetRequiredService<AppStoreVerifier>().IsConfigured,
+    league = c.GetValue("League:Enabled", true),
+    chat = c.GetValue("Match:ChatEnabled", true),
 }));
 app.MapHealthChecks("/health");
 app.MapGet("/stats/live", (MatchService m, MatchmakingService mm) => Results.Ok(new { liveMatches = m.LiveMatchCount, queued = mm.QueuedCount }));
 app.MapAuthEndpoints();
 app.MapAccountEndpoints();
-// Development-only tools (test gem grant). Never mapped outside the Development environment.
+app.MapStoreEndpoints();
+app.MapLeagueEndpoints();
+// Development-only tools (test gems/gold/bottles, end a league season). Never mapped outside the Development environment.
 if (app.Environment.IsDevelopment() && config.GetValue("DevTools:AllowGemGrant", false))
 {
     app.MapDevEndpoints();
-    app.Logger.LogWarning("DEVELOPMENT ONLY: /dev/gems/grant is enabled. It is never available in Production.");
+    app.MapDevStoreEndpoints();
+    app.MapDevLeagueEndpoints();
+    app.Logger.LogWarning("DEVELOPMENT ONLY: /dev/gems/grant, /dev/economy/grant and /dev/league/end-season are enabled. They are never available in Production.");
 }
+if (devSandboxStore) app.Logger.LogWarning("DEVELOPMENT ONLY: the dev_sandbox store is enabled (fake purchases, environment 'development').");
 app.MapHub<MatchHub>(HubNames.Path);
 
 var auth = app.Services.GetRequiredService<IOptions<AuthOptions>>().Value;

@@ -25,6 +25,15 @@ public sealed class SeatSlot
     public DateTimeOffset LastReactionAt { get; set; } = DateTimeOffset.MinValue;
     /// <summary>Server-side cache of the player's gem balance (source of truth is the wallet store).</summary>
     public long Gems { get; set; }
+    /// <summary>Server-side cache of the player's Shield bottles (source of truth is the economy store).</summary>
+    public int ShieldBottles { get; set; }
+    /// <summary>Public friend code shown to other players (never the internal account id).</summary>
+    public string? PublicId { get; set; }
+    public string? FrameId { get; set; }
+    /// <summary>The player's chat setting; when off they neither send nor receive quick chat.</summary>
+    public bool ChatEnabled { get; set; } = true;
+    /// <summary>Recent quick-chat send times for rate limiting.</summary>
+    public Queue<DateTimeOffset> RecentChats { get; } = new();
 
     public bool IsHuman => !IsBot && UserId is not null;
     /// <summary>True when the server plays this seat (bots and abandoned humans).</summary>
@@ -49,6 +58,12 @@ public sealed class MatchRoom
     public required IBotStrategy Bot { get; init; }
     /// <summary>Answers to reroll requests already handled in this match, keyed by user + request id (idempotency).</summary>
     public Dictionary<string, RerollResult> ProcessedRerolls { get; } = new();
+    /// <summary>Answers to boost requests already handled, keyed by user + request id (idempotency).</summary>
+    public Dictionary<string, BoostResult> ProcessedBoosts { get; } = new();
+
+    /// <summary>Ranked matchmaking match: counts for the league, never allows boosts.</summary>
+    public bool IsRanked => Mode == MatchMode.Matchmaking;
+    public MatchQueue Queue => Mode == MatchMode.Matchmaking ? MatchQueue.Ranked : MatchQueue.Casual;
 
     public string MatchIdString => Id.ToString("N");
 
@@ -67,6 +82,19 @@ public sealed class MatchRoom
         if (State.Players[slot.Seat].RerollsUsed >= State.Rules.MaxRerolls) return RerollStatus.NoRerollsLeft;
         if (slot.Gems < GameModes.RerollGemCost) return RerollStatus.InsufficientGems;
         return RerollStatus.Available;
+    }
+
+    /// <summary>Why the given player can or cannot drink a Shield right now.</summary>
+    public BoostStatus BoostStatusFor(SeatSlot? slot)
+    {
+        if (slot is null || Ended || slot.Abandoned || !slot.IsHuman) return BoostStatus.Unavailable;
+        if (State.Rules.MaxBoosts <= 0) return BoostStatus.NotInThisMatch;
+        var player = State.Players[slot.Seat];
+        if (player.BoostsUsed >= State.Rules.MaxBoosts || player.ShieldActive) return BoostStatus.NoBoostsLeft;
+        if (State.CurrentPlayer.Seat != slot.Seat) return BoostStatus.NotYourTurn;
+        if (State.Phase != GamePhase.AwaitingRoll) return BoostStatus.OnlyBeforeRolling;
+        if (slot.ShieldBottles < 1) return BoostStatus.NoBottles;
+        return BoostStatus.Available;
     }
 
     public MatchSnapshot SnapshotFor(Guid? userId)
@@ -95,7 +123,12 @@ public sealed class MatchRoom
             State.Rules.MaxRerolls,
             RerollStatusFor(yourSlot),
             yourSlot is { IsHuman: true } ? (int)yourSlot.Gems : null,
-            !Ended && yourSeat == State.CurrentPlayer.Seat && GameEngine.IsHeldWithoutMoves(State));
+            !Ended && yourSeat == State.CurrentPlayer.Seat && GameEngine.IsHeldWithoutMoves(State),
+            Queue,
+            Mode == MatchMode.Private,
+            State.Rules.MaxBoosts,
+            BoostStatusFor(yourSlot),
+            yourSlot is { IsHuman: true } ? yourSlot.ShieldBottles : null);
     }
 
     public IReadOnlyList<SeatInfo> SeatInfos() => Seats.Select(s => new SeatInfo(
@@ -105,5 +138,9 @@ public sealed class MatchRoom
         s.AvatarId,
         s.ServerControlled,
         s.IsBot || (s.Connected && !s.Abandoned),
-        State.Players[s.Seat].RerollsUsed)).ToList();
+        State.Players[s.Seat].RerollsUsed,
+        s.IsHuman ? s.PublicId : null,
+        State.Players[s.Seat].ShieldActive,
+        State.Players[s.Seat].BoostsUsed,
+        s.IsHuman ? s.FrameId : null)).ToList();
 }

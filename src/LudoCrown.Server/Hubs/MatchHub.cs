@@ -36,12 +36,14 @@ public sealed class MatchHub(MatchService matches, MatchmakingService matchmakin
     }
 
     [HubMethodName(HubNames.FindMatch)]
-    public async Task<MatchmakingStatus> FindMatch(int playerCount, string mode)
+    public async Task<MatchmakingStatus> FindMatch(int playerCount, string mode, string queue)
     {
         if (GameModes.Parse(mode) is not GameMode gameMode)
             return new MatchmakingStatus(MatchmakingState.Failed, playerCount, 0, null, "That game mode isn't available.");
-        var (status, error) = await matchmaking.EnqueueAsync(UserId, playerCount, gameMode);
-        return status ?? new MatchmakingStatus(MatchmakingState.Failed, playerCount, 0, null, error?.Message, gameMode);
+        if (MatchQueues.Parse(queue) is not MatchQueue q)
+            return new MatchmakingStatus(MatchmakingState.Failed, playerCount, 0, null, "Choose ranked or casual.", gameMode);
+        var (status, error) = await matchmaking.EnqueueAsync(UserId, playerCount, gameMode, q);
+        return status ?? new MatchmakingStatus(MatchmakingState.Failed, playerCount, 0, null, error?.Message, gameMode, q);
     }
 
     [HubMethodName(HubNames.CancelMatchmaking)]
@@ -89,6 +91,10 @@ public sealed class MatchHub(MatchService matches, MatchmakingService matchmakin
 
     [HubMethodName(HubNames.PassTurn)]
     public Task<ServerError?> PassTurn(string matchId, long expectedVersion) => matches.PassAsync(UserId, matchId, expectedVersion);
+
+    /// <summary>Drinks a Shield bottle (casual matches). <paramref name="requestId"/> is a client GUID reused on retries.</summary>
+    [HubMethodName(HubNames.UseBoost)]
+    public Task<BoostResult> UseBoost(string matchId, long expectedVersion, string requestId) => matches.UseBoostAsync(UserId, matchId, expectedVersion, requestId);
 
     [HubMethodName(HubNames.Resync)]
     public Task<MatchSnapshot?> Resync(string? matchId) => matches.ResyncAsync(UserId, matchId);

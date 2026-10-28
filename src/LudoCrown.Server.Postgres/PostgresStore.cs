@@ -60,10 +60,10 @@ public sealed class PostgresStore(NpgsqlDataSource db, TimeProvider time) : IAcc
     private static AuthCodeRecord MapCode(NpgsqlDataReader r) => new(r.GetGuid(0), r.GetString(1), r.GetFieldValue<byte[]>(2), NullableGuid(r, 3), NullableString(r, 4), Time(r, 5), r.GetInt32(6));
     private static RefreshTokenRecord MapRefresh(NpgsqlDataReader r) => new(r.GetGuid(0), r.GetGuid(1), r.GetFieldValue<byte[]>(2), Time(r, 3), Time(r, 4), NullableTime(r, 5), NullableGuid(r, 6));
 
-    private static string ModeText(MatchMode m) => m == MatchMode.Private ? "private" : "matchmaking";
+    private static string ModeText(MatchMode m) => m switch { MatchMode.Private => "private", MatchMode.Casual => "casual", _ => "matchmaking" };
     private static string GameModeText(LudoCrown.Core.Model.GameMode m) => m.ToString().ToLowerInvariant();
     private static LudoCrown.Core.Model.GameMode ParseGameMode(string s) => LudoCrown.Core.Model.GameModes.Parse(s) ?? LudoCrown.Core.Model.GameMode.Classic;
-    private static MatchMode ParseMode(string s) => s == "private" ? MatchMode.Private : MatchMode.Matchmaking;
+    private static MatchMode ParseMode(string s) => s switch { "private" => MatchMode.Private, "casual" => MatchMode.Casual, _ => MatchMode.Matchmaking };
     private static string ResultText(ParticipantResult r) => r switch { ParticipantResult.Win => "win", ParticipantResult.Abandoned => "abandoned", _ => "loss" };
     private static ParticipantResult ParseResult(string s) => s switch { "win" => ParticipantResult.Win, "abandoned" => ParticipantResult.Abandoned, _ => ParticipantResult.Loss };
     private static (Guid Low, Guid High) Pair(Guid a, Guid b) => a.CompareTo(b) < 0 ? (a, b) : (b, a);

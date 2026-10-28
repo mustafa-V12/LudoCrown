@@ -98,6 +98,11 @@ namespace Xunit
             if (actual is null || !actual.EndsWith(expected, StringComparison.Ordinal)) Fail($"\"{actual}\" does not end with \"{expected}\"");
         }
 
+        public static void DoesNotContain(string expected, string? actual)
+        {
+            if (actual is not null && actual.Contains(expected, StringComparison.Ordinal)) Fail($"\"{expected}\" was found");
+        }
+
         public static void DoesNotContain<T>(T expected, IEnumerable<T> collection)
         {
             if (collection.Contains(expected)) Fail($"{expected} was found");
@@ -117,6 +122,8 @@ namespace Xunit
         {
             if (!collection.Cast<object>().Any()) Fail("Expected non-empty collection");
         }
+
+        public static T Single<T>(IEnumerable<T> collection, Predicate<T> filter) => Single(collection.Where(x => filter(x)));
 
         public static T Single<T>(IEnumerable<T> collection)
         {

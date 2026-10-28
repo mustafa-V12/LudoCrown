@@ -24,6 +24,7 @@ public static class HubNames
     public const string RequestRematch = "RequestRematch";
     public const string Reroll = "Reroll";
     public const string PassTurn = "PassTurn";
+    public const string UseBoost = "UseBoost";
 
     // Server → client
     public const string OnMatchState = "MatchState";
@@ -34,8 +35,47 @@ public static class HubNames
     public const string OnError = "Error";
 }
 
-/// <summary>Seat as shown to clients (no internal ids beyond the public player id).</summary>
-public sealed record SeatInfo(int Seat, PlayerColor Color, string DisplayName, string AvatarId, bool IsBot, bool IsConnected, int RerollsUsed = 0);
+/// <summary>
+/// Seat as shown to clients. No internal account ids: <see cref="PublicId"/> is the player's public friend code
+/// (null for bots), used to open their public profile.
+/// </summary>
+public sealed record SeatInfo(int Seat, PlayerColor Color, string DisplayName, string AvatarId, bool IsBot, bool IsConnected, int RerollsUsed = 0,
+    string? PublicId = null, bool ShieldActive = false, int BoostsUsed = 0, string? FrameId = null);
+
+/// <summary>
+/// Matchmaking queue. Ranked matches count for the league and never allow boost bottles; casual matches allow
+/// boosts (1 per player) and give no league points. Private tables are always casual.
+/// </summary>
+public enum MatchQueue { Ranked = 0, Casual = 1 }
+
+public static class MatchQueues
+{
+    public static MatchQueue? Parse(string? value) => value?.Trim().ToLowerInvariant() switch
+    {
+        null or "" or "ranked" or "0" => MatchQueue.Ranked,
+        "casual" or "1" => MatchQueue.Casual,
+        _ => null,
+    };
+}
+
+/// <summary>Why the boost button is (un)available for the receiving player. Computed by the server.</summary>
+public enum BoostStatus
+{
+    Available,
+    NotYourTurn,
+    /// <summary>Boosts are drunk at the start of your turn, before rolling.</summary>
+    OnlyBeforeRolling,
+    /// <summary>Already used the match's boost allowance (or a shield is still active).</summary>
+    NoBoostsLeft,
+    /// <summary>The player owns no Shield bottle.</summary>
+    NoBottles,
+    /// <summary>This match does not allow boosts (ranked league match).</summary>
+    NotInThisMatch,
+    Unavailable,
+}
+
+/// <summary>Result of a boost request. On error nothing was consumed.</summary>
+public sealed record BoostResult(ServerError? Error, int? BottlesLeft, int BoostsUsed, int BoostsRemaining);
 
 /// <summary>Why the reroll button is (un)available for the receiving player. Computed by the server.</summary>
 public enum RerollStatus
@@ -74,29 +114,76 @@ public sealed record MatchSnapshot(
     int MaxRerolls = 7,
     RerollStatus RerollStatus = RerollStatus.Unavailable,
     int? YourGems = null,
-    bool CanPass = false);
+    bool CanPass = false,
+    MatchQueue Queue = MatchQueue.Ranked,
+    bool IsPrivate = false,
+    int MaxBoosts = 0,
+    BoostStatus BoostStatus = BoostStatus.Unavailable,
+    int? YourShieldBottles = null);
 
 public sealed record RoomInfo(string RoomId, string? Code, int PlayerCount, IReadOnlyList<SeatInfo> Seats, bool IsHost, bool Started, string? MatchId, GameMode Mode = GameMode.Classic);
 
 public enum MatchmakingState { Searching, Matched, Cancelled, Failed }
 
-public sealed record MatchmakingStatus(MatchmakingState State, int PlayerCount, int PlayersFound, string? MatchId, string? Message, GameMode Mode = GameMode.Classic);
+public sealed record MatchmakingStatus(MatchmakingState State, int PlayerCount, int PlayersFound, string? MatchId, string? Message, GameMode Mode = GameMode.Classic, MatchQueue Queue = MatchQueue.Ranked);
 
-public sealed record MatchEndedInfo(string MatchId, IReadOnlyList<int> Standings, int YourPlacement, int CoinsAwarded, int XpAwarded, string Reason, int GemsAwarded = 0, GameMode Mode = GameMode.Classic);
+/// <summary><see cref="LeaguePoints"/> is null when the match did not count for the league (casual, private, fewer than 2 humans).</summary>
+public sealed record MatchEndedInfo(string MatchId, IReadOnlyList<int> Standings, int YourPlacement, int CoinsAwarded, int XpAwarded, string Reason, int GemsAwarded = 0, GameMode Mode = GameMode.Classic,
+    int? LeaguePoints = null, MatchQueue Queue = MatchQueue.Ranked, bool IsPrivate = false);
 
 public sealed record ServerError(ErrorCode Code, string Message);
 
 /// <summary>Result of a hub call that returns a value or an error.</summary>
 public sealed record HubResult<T>(T? Value, ServerError? Error);
 
+/// <summary>A quick-chat message delivered to the other players: a preset phrase or emoji, by id.</summary>
 public sealed record ReactionInfo(int Seat, string ReactionId);
 
+public enum QuickChatKind { Phrase, Emoji }
+
+public sealed record QuickChatItem(string Id, QuickChatKind Kind, string Text);
+
+/// <summary>
+/// Match chat is preset phrases and emoji only — no free text, so nothing personal can be shared and there is nothing
+/// to moderate. Clients send an id; the server validates it, rate-limits, and skips players who blocked each other
+/// or turned chat off. Text is shown from this shared table.
+/// </summary>
 public static class Reactions
 {
-    /// <summary>Preset reactions only: no free-text chat, so there is nothing to moderate.</summary>
-    public static readonly IReadOnlyList<string> All = new[] { "wave", "gg", "wow", "laugh", "crown", "oops", "thanks", "hurry" };
+    public static readonly IReadOnlyList<QuickChatItem> Items = new QuickChatItem[]
+    {
+        new("hello", QuickChatKind.Phrase, "Hello!"),
+        new("good_luck", QuickChatKind.Phrase, "Good luck!"),
+        new("nice_move", QuickChatKind.Phrase, "Nice move!"),
+        new("well_played", QuickChatKind.Phrase, "Well played!"),
+        new("so_close", QuickChatKind.Phrase, "So close!"),
+        new("oops", QuickChatKind.Phrase, "Oops!"),
+        new("sorry", QuickChatKind.Phrase, "Sorry!"),
+        new("thanks", QuickChatKind.Phrase, "Thanks!"),
+        new("your_move", QuickChatKind.Phrase, "Your move!"),
+        new("thinking", QuickChatKind.Phrase, "Thinking…"),
+        new("gg", QuickChatKind.Phrase, "Good game!"),
+        new("rematch", QuickChatKind.Phrase, "Rematch?"),
+        new("laugh", QuickChatKind.Emoji, "😂"),
+        new("wow", QuickChatKind.Emoji, "😮"),
+        new("love", QuickChatKind.Emoji, "😍"),
+        new("cry", QuickChatKind.Emoji, "😢"),
+        new("angry", QuickChatKind.Emoji, "😠"),
+        new("cool", QuickChatKind.Emoji, "😎"),
+        new("clap", QuickChatKind.Emoji, "👏"),
+        new("crown", QuickChatKind.Emoji, "👑"),
+    };
+
+    public static readonly IReadOnlyList<string> All = Items.Select(i => i.Id).ToList();
 
     public static bool IsValid(string? id) => id is not null && All.Contains(id);
+
+    public static string TextFor(string id) => Items.FirstOrDefault(i => i.Id == id)?.Text ?? "";
+
+    /// <summary>At most this many messages per sender in <see cref="WindowSeconds"/>, and never faster than <see cref="MinGapSeconds"/>.</summary>
+    public const int MaxPerWindow = 6;
+    public const int WindowSeconds = 20;
+    public const double MinGapSeconds = 1.5;
 }
 
 /// <summary>

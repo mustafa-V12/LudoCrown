@@ -8,7 +8,7 @@ using Microsoft.Extensions.Options;
 namespace LudoCrown.Server.Matches;
 
 /// <summary>
-/// Simple first-come matchmaking with one queue per player count (2 or 4) and game mode (Classic, Quick). When a queue has enough
+/// Simple first-come matchmaking with one queue per player count (2 or 4), game mode (Classic, Quick) and queue (Ranked, Casual). When a queue has enough
 /// players a match starts. If someone waits longer than MatchmakingBotFillSeconds, the empty seats are
 /// filled with bots (shown as bots in the UI) so players are never stuck waiting.
 /// Players who have blocked each other are never placed in the same match.
@@ -16,14 +16,14 @@ namespace LudoCrown.Server.Matches;
 /// </summary>
 public sealed class MatchmakingService(MatchService matches, ISocialStore social, IMatchNotifier notifier, IOptions<MatchOptions> options, TimeProvider time)
 {
-    private sealed record Ticket(Guid UserId, int PlayerCount, GameMode Mode, DateTimeOffset EnqueuedAt);
+    private sealed record Ticket(Guid UserId, int PlayerCount, GameMode Mode, MatchQueue Queue, DateTimeOffset EnqueuedAt);
 
     private readonly object _gate = new();
     private readonly List<Ticket> _tickets = new();
 
     public int QueuedCount { get { lock (_gate) return _tickets.Count; } }
 
-    public async Task<(MatchmakingStatus? Status, ServerError? Error)> EnqueueAsync(Guid userId, int playerCount, GameMode mode = GameMode.Classic)
+    public async Task<(MatchmakingStatus? Status, ServerError? Error)> EnqueueAsync(Guid userId, int playerCount, GameMode mode = GameMode.Classic, MatchQueue queue = MatchQueue.Ranked)
     {
         if (!GameModes.IsAvailable(mode))
             return (null, new ServerError(ErrorCode.InvalidMode, "That game mode isn't available."));
@@ -37,18 +37,18 @@ public sealed class MatchmakingService(MatchService matches, ISocialStore social
         lock (_gate)
         {
             _tickets.RemoveAll(t => t.UserId == userId);
-            _tickets.Add(new Ticket(userId, playerCount, mode, time.GetUtcNow()));
+            _tickets.Add(new Ticket(userId, playerCount, mode, queue, time.GetUtcNow()));
         }
 
-        await TryFormAsync(playerCount, mode, fillWithBots: false);
+        await TryFormAsync(playerCount, mode, queue, fillWithBots: false);
         lock (_gate)
         {
             if (!_tickets.Any(t => t.UserId == userId))
-                return (new MatchmakingStatus(MatchmakingState.Matched, playerCount, playerCount, matches.ActiveMatchFor(userId)?.ToString("N"), null, mode), null);
-            found = _tickets.Count(t => t.PlayerCount == playerCount && t.Mode == mode);
+                return (new MatchmakingStatus(MatchmakingState.Matched, playerCount, playerCount, matches.ActiveMatchFor(userId)?.ToString("N"), null, mode, queue), null);
+            found = _tickets.Count(t => t.PlayerCount == playerCount && t.Mode == mode && t.Queue == queue);
         }
-        var status = new MatchmakingStatus(MatchmakingState.Searching, playerCount, Math.Min(found, playerCount), null, null, mode);
-        await NotifyQueueAsync(playerCount, mode);
+        var status = new MatchmakingStatus(MatchmakingState.Searching, playerCount, Math.Min(found, playerCount), null, null, mode, queue);
+        await NotifyQueueAsync(playerCount, mode, queue);
         return (status, null);
     }
 
@@ -62,8 +62,8 @@ public sealed class MatchmakingService(MatchService matches, ISocialStore social
         }
         if (t is not null)
         {
-            await notifier.SendMatchmakingStatusAsync(userId, new MatchmakingStatus(MatchmakingState.Cancelled, t.PlayerCount, 0, null, null, t.Mode));
-            await NotifyQueueAsync(t.PlayerCount, t.Mode);
+            await notifier.SendMatchmakingStatusAsync(userId, new MatchmakingStatus(MatchmakingState.Cancelled, t.PlayerCount, 0, null, null, t.Mode, t.Queue));
+            await NotifyQueueAsync(t.PlayerCount, t.Mode, t.Queue);
         }
     }
 
@@ -71,24 +71,25 @@ public sealed class MatchmakingService(MatchService matches, ISocialStore social
     {
         foreach (var count in new[] { 2, 4 })
         foreach (var mode in GameModes.All.Select(m => m.Mode))
+        foreach (var queue in new[] { MatchQueue.Ranked, MatchQueue.Casual })
         {
             bool overdue;
             lock (_gate)
             {
-                var oldest = _tickets.Where(t => t.PlayerCount == count && t.Mode == mode).OrderBy(t => t.EnqueuedAt).FirstOrDefault();
+                var oldest = _tickets.Where(t => t.PlayerCount == count && t.Mode == mode && t.Queue == queue).OrderBy(t => t.EnqueuedAt).FirstOrDefault();
                 overdue = options.Value.MatchmakingBotFillSeconds > 0 && oldest is not null
                           && time.GetUtcNow() - oldest.EnqueuedAt >= TimeSpan.FromSeconds(options.Value.MatchmakingBotFillSeconds);
             }
-            await TryFormAsync(count, mode, overdue);
+            await TryFormAsync(count, mode, queue, overdue);
         }
     }
 
-    private async Task TryFormAsync(int playerCount, GameMode mode, bool fillWithBots)
+    private async Task TryFormAsync(int playerCount, GameMode mode, MatchQueue queue, bool fillWithBots)
     {
         while (true)
         {
             List<Ticket> candidates;
-            lock (_gate) candidates = _tickets.Where(t => t.PlayerCount == playerCount && t.Mode == mode).OrderBy(t => t.EnqueuedAt).ToList();
+            lock (_gate) candidates = _tickets.Where(t => t.PlayerCount == playerCount && t.Mode == mode && t.Queue == queue).OrderBy(t => t.EnqueuedAt).ToList();
             if (candidates.Count == 0) return;
 
             // Greedily build a group of players who have not blocked each other, oldest first.
@@ -115,19 +116,19 @@ public sealed class MatchmakingService(MatchService matches, ISocialStore social
             var seats = new List<Guid?>(group.Select(g => (Guid?)g.UserId));
             while (seats.Count < playerCount) seats.Add(null);
             Shuffle(seats);
-            var matchId = await matches.StartMatchAsync(MatchMode.Matchmaking, seats, null, mode);
+            var matchId = await matches.StartMatchAsync(queue == MatchQueue.Ranked ? MatchMode.Matchmaking : MatchMode.Casual, seats, null, mode);
             foreach (var g in group)
-                await notifier.SendMatchmakingStatusAsync(g.UserId, new MatchmakingStatus(MatchmakingState.Matched, playerCount, group.Count, matchId.ToString("N"), null, mode));
+                await notifier.SendMatchmakingStatusAsync(g.UserId, new MatchmakingStatus(MatchmakingState.Matched, playerCount, group.Count, matchId.ToString("N"), null, mode, queue));
             fillWithBots = false; // only one bot-filled match per tick
         }
     }
 
-    private async Task NotifyQueueAsync(int playerCount, GameMode mode)
+    private async Task NotifyQueueAsync(int playerCount, GameMode mode, MatchQueue queue)
     {
         List<Guid> waiting;
-        lock (_gate) waiting = _tickets.Where(t => t.PlayerCount == playerCount && t.Mode == mode).Select(t => t.UserId).ToList();
+        lock (_gate) waiting = _tickets.Where(t => t.PlayerCount == playerCount && t.Mode == mode && t.Queue == queue).Select(t => t.UserId).ToList();
         foreach (var u in waiting)
-            await notifier.SendMatchmakingStatusAsync(u, new MatchmakingStatus(MatchmakingState.Searching, playerCount, Math.Min(waiting.Count, playerCount), null, null, mode));
+            await notifier.SendMatchmakingStatusAsync(u, new MatchmakingStatus(MatchmakingState.Searching, playerCount, Math.Min(waiting.Count, playerCount), null, null, mode, queue));
     }
 
     private static void Shuffle<T>(IList<T> list)

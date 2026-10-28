@@ -252,8 +252,8 @@ public class MatchServiceTests
 
         await h.Store.BlockAsync(b, a, h.Time.GetUtcNow());
         h.Time.Advance(TimeSpan.FromSeconds(3));
-        await h.Matches.ReactAsync(a, id.ToString("N"), "wave");
-        Assert.DoesNotContain(h.Notifier.Reactions, r => r.User == b && r.Reaction.ReactionId == "wave");
+        await h.Matches.ReactAsync(a, id.ToString("N"), "hello");
+        Assert.DoesNotContain(h.Notifier.Reactions, r => r.User == b && r.Reaction.ReactionId == "hello");
     }
 
     [Fact]

@@ -41,5 +41,8 @@ public static class GameStateSerializer
         if (s.Rules.PiecesToWin is < 1 or > Board.BoardGeometry.PiecesPerPlayer) throw new JsonException("Invalid win condition.");
         if (s.Rules.MaxRerolls is < 0 or > 20) throw new JsonException("Invalid reroll limit.");
         if (s.Players.Any(p => p.RerollsUsed < 0 || p.RerollsUsed > s.Rules.MaxRerolls)) throw new JsonException("Invalid reroll count.");
+        if (s.Rules.MaxBoosts is < 0 or > 3) throw new JsonException("Invalid boost limit.");
+        if (s.Players.Any(p => p.BoostsUsed < 0 || p.BoostsUsed > s.Rules.MaxBoosts)) throw new JsonException("Invalid boost count.");
+        if (s.Players.Any(p => p.ShieldActive && p.BoostsUsed == 0)) throw new JsonException("Invalid shield state.");
     }
 }

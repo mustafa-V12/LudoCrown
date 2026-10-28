@@ -14,7 +14,9 @@ public sealed class AccountService(
     IProfileStore profiles,
     IMatchStore matches,
     ISocialStore social,
-    TokenService tokens)
+    TokenService tokens,
+    IEconomyStore economy,
+    IPurchaseStore purchases)
 {
     public async Task<TokenPair> CreateGuestAsync(string? displayName, CancellationToken ct = default)
     {
@@ -67,9 +69,15 @@ public sealed class AccountService(
             await profiles.GetProfileAsync(userId, ct),
             await profiles.GetStatsAsync(userId, ct),
             await profiles.GetCoinsAsync(userId, ct),
-            await matches.GetHistoryAsync(userId, 1000, ct),
+            await matches.GetHistoryAsync(userId, 1000, null, ct),
             await social.GetFriendsAsync(userId, ct),
-            await social.GetBlockedAsync(userId, ct));
+            await social.GetBlockedAsync(userId, ct),
+            (await economy.GetBalancesAsync(userId, ct))?.Gems ?? 0,
+            (await economy.GetBalancesAsync(userId, ct))?.Items,
+            await economy.GetLedgerAsync(userId, 1000, ct),
+            await purchases.GetPurchasesForUserAsync(userId, 1000, ct),
+            await profiles.GetPrivacyAsync(userId, ct),
+            await profiles.GetModeStatsAsync(userId, ct));
     }
 
     /// <summary>Turns a provider-supplied or user-typed name into a valid display name, or generates one.</summary>

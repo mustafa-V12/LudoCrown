@@ -14,6 +14,12 @@ public enum GameEventType
     ExtraTurn,
     TurnPassed,
     GameWon,
+    /// <summary>A player drank a Shield bottle. Seat = that player.</summary>
+    ShieldActivated,
+    /// <summary>A Shield ran out because its owner's next turn began. Seat = owner.</summary>
+    ShieldExpired,
+    /// <summary>A piece landed on a shielded piece, which was not captured. Seat = shielded owner, Piece = their piece, Value = the moving seat.</summary>
+    CaptureBlockedByShield,
 }
 
 /// <summary>
@@ -47,6 +53,14 @@ public enum ErrorCode
     RerollNotAllowed,
     /// <summary>The mode is unknown or not available.</summary>
     InvalidMode,
+    /// <summary>Boosts are not allowed in this match (ranked league, offline) or not at this moment (only before rolling).</summary>
+    BoostNotAllowed,
+    /// <summary>The player has used all boosts allowed in this match.</summary>
+    NoBoostsLeft,
+    /// <summary>The player owns no boost bottle of that kind.</summary>
+    NoBoostItem,
+    /// <summary>Chat is turned off (by the player, or on this server).</summary>
+    ChatDisabled,
 }
 
 public sealed record EngineResult(bool Ok, Model.GameState State, IReadOnlyList<GameEvent> Events, ErrorCode Error = ErrorCode.None)

@@ -40,5 +40,4 @@ public sealed record DeleteAccountRequest(string? AppleAuthorizationCode);
 public sealed record DeleteAccountResponse(bool Deleted, bool AppleTokenRevoked, string? Note);
 public sealed record FriendRequest(string FriendCode);
 public sealed record FriendRequestResponse(FriendshipStatus Status, string DisplayName);
-public sealed record ReportRequest(Guid UserId, Guid? MatchId, string Reason, string? Details);
-public sealed record PublicProfileResponse(Guid UserId, string DisplayName, string AvatarId, int Level, int GamesPlayed, int GamesWon);
+public sealed record ReportRequest(Guid? UserId, Guid? MatchId, string Reason, string? Details, string? PublicId = null);

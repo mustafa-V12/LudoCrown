@@ -2,7 +2,9 @@ using LudoCrown.Core.Dice;
 using LudoCrown.Core.Protocol;
 using LudoCrown.Server.Auth;
 using LudoCrown.Server.Data;
+using LudoCrown.Server.League;
 using LudoCrown.Server.Matches;
+using LudoCrown.Server.Store;
 using LudoCrown.Server.Options;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -60,20 +62,28 @@ public sealed class ServerHarness
     public PrivateRoomService Rooms { get; }
     public TokenService Tokens { get; }
     public AccountService Accounts { get; }
+    public LeagueOptions LeagueOptions { get; } = new() { Enabled = true, SeasonDays = 14 };
+    public StoreOptions StoreOptions { get; } = new();
+    public LeagueService League { get; }
+    public PurchaseService Purchases { get; }
+    /// <summary>Verifiers used by <see cref="Purchases"/>; tests add fakes before the first purchase.</summary>
+    public List<IPurchaseVerifier> Verifiers { get; } = new() { new DevSandboxVerifier() };
 
     public ServerHarness()
     {
         Store = new InMemoryStore(Time);
         var mo = Microsoft.Extensions.Options.Options.Create(MatchOptions);
+        League = new LeagueService(Store, Store, Microsoft.Extensions.Options.Options.Create(LeagueOptions), Time, NullLogger<LeagueService>.Instance);
+        Purchases = new PurchaseService(Verifiers, Store, Store, Microsoft.Extensions.Options.Options.Create(StoreOptions), Time, NullLogger<PurchaseService>.Instance);
         Matches = NewMatchService();
         Matchmaking = new MatchmakingService(Matches, Store, Notifier, mo, Time);
         Rooms = new PrivateRoomService(Matches, Store, Store, Notifier, mo, Time);
         Tokens = new TokenService(Microsoft.Extensions.Options.Options.Create(Jwt), Store, Time);
-        Accounts = new AccountService(Store, Store, Store, Store, Tokens);
+        Accounts = new AccountService(Store, Store, Store, Store, Tokens, Store, Store);
     }
 
     public MatchService NewMatchService() =>
-        new(Store, Store, Store, Store, Notifier, Dice, Microsoft.Extensions.Options.Options.Create(MatchOptions), Time, NullLogger<MatchService>.Instance);
+        new(Store, Store, Store, Store, Notifier, Dice, Microsoft.Extensions.Options.Options.Create(MatchOptions), Time, NullLogger<MatchService>.Instance, Store, League);
 
     public async Task<Guid> NewUserAsync(string name = "Player")
     {
@@ -81,13 +91,24 @@ public sealed class ServerHarness
         return user.Id;
     }
 
-    public async Task<(Guid A, Guid B, Guid MatchId)> StartTwoPlayerAsync(bool connected = true, LudoCrown.Core.Model.GameMode mode = LudoCrown.Core.Model.GameMode.Classic)
+    public async Task<(Guid A, Guid B, Guid MatchId)> StartTwoPlayerAsync(bool connected = true, LudoCrown.Core.Model.GameMode mode = LudoCrown.Core.Model.GameMode.Classic,
+        MatchMode matchMode = MatchMode.Matchmaking)
     {
         var a = await NewUserAsync("Alice");
         var b = await NewUserAsync("Bob");
         if (connected) { await Matches.OnConnectedAsync(a); await Matches.OnConnectedAsync(b); }
-        var id = await Matches.StartMatchAsync(MatchMode.Matchmaking, new Guid?[] { a, b }, null, mode);
+        var id = await Matches.StartMatchAsync(matchMode, new Guid?[] { a, b }, null, mode);
         return (a, b, id);
+    }
+
+    /// <summary>Gives a user items/currency directly (test setup), recorded like any economy operation.</summary>
+    public async Task GrantAsync(Guid user, long coins = 0, long gems = 0, int shields = 0)
+    {
+        var r = await Store.ApplyAsync(new EconomyOperation(user, "test:" + Guid.NewGuid(), Economy.Reasons.AdminAdjustment, new[]
+        {
+            new AssetChange(Economy.Coins, coins), new AssetChange(Economy.Gems, gems), new AssetChange(LudoCrown.Core.Model.Boosts.ShieldId, shields),
+        }, Time.GetUtcNow()));
+        if (!r.Ok) throw new InvalidOperationException(r.Outcome.ToString());
     }
 
     /// <summary>Removes gems from every human in a match so no-move rolls pass immediately (base turn-flow tests).</summary>

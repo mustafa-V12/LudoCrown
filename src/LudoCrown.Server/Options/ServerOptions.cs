@@ -76,6 +76,8 @@ public sealed class MatchOptions
     /// they can reroll (gem) or pass; when the window ends it is passed automatically (not counted as a missed turn).
     /// </summary>
     public double HeldRollSeconds { get; set; } = 5;
+    /// <summary>Server-wide switch for in-match quick chat (moderation kill switch). Players can also turn chat off for themselves.</summary>
+    public bool ChatEnabled { get; set; } = true;
     /// <summary>Pause before bots act, so moves are readable.</summary>
     public double BotDelaySeconds { get; set; } = 1.0;
     /// <summary>Matchmaking fills empty seats with clearly-labelled bots after this wait. 0 disables.</summary>

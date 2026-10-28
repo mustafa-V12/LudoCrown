@@ -16,6 +16,12 @@ public sealed record RuleSet
     /// <summary>Maximum gem rerolls each player may use in one match (7 Classic, 5 Quick).</summary>
     public int MaxRerolls { get; init; } = 7;
 
+    /// <summary>
+    /// Boost bottles each player may use in one match. 0 (the default) disables boosts: ranked league matches,
+    /// offline games and the standard mode rules. The server sets 1 for casual matchmaking and private tables.
+    /// </summary>
+    public int MaxBoosts { get; init; }
+
     /// <summary>Die values that let a piece leave the yard. Default: only 6.</summary>
     public IReadOnlyList<int> EntryRolls { get; init; } = new[] { 6 };
 

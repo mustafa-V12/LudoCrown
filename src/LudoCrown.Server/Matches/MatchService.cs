@@ -6,6 +6,7 @@ using LudoCrown.Core.Model;
 using LudoCrown.Core.Protocol;
 using LudoCrown.Core.Serialization;
 using LudoCrown.Server.Data;
+using LudoCrown.Server.League;
 using LudoCrown.Server.Options;
 using Microsoft.Extensions.Options;
 
@@ -28,7 +29,9 @@ public sealed class MatchService(
     IDiceRoller dice,
     IOptions<MatchOptions> options,
     TimeProvider time,
-    ILogger<MatchService> logger)
+    ILogger<MatchService> logger,
+    IEconomyStore economy,
+    LeagueService? league = null)
 {
     private static readonly string[] BotNames = { "Duchess Bot", "Baron Bot", "Squire Bot", "Countess Bot", "Marquis Bot", "Jester Bot" };
 
@@ -59,14 +62,15 @@ public sealed class MatchService(
             if (u is Guid id)
             {
                 var p = profileMap.GetValueOrDefault(id);
-                return new SeatSlot { Seat = i, UserId = id, DisplayName = p?.DisplayName ?? "Player", AvatarId = p?.AvatarId ?? "crown", Connected = IsConnected(id), DisconnectedAt = IsConnected(id) ? null : now };
+                return new SeatSlot { Seat = i, UserId = id, DisplayName = p?.DisplayName ?? "Player", AvatarId = p?.AvatarId ?? "crown", Connected = IsConnected(id), DisconnectedAt = IsConnected(id) ? null : now,
+                    PublicId = p?.FriendCode, FrameId = p?.FrameId };
             }
             return new SeatSlot { Seat = i, IsBot = true, DisplayName = BotNames[(botIndex + i) % BotNames.Length], AvatarId = Avatars.All[(botIndex + i) % Avatars.All.Count], Connected = true };
         }).ToArray();
 
         var state = GameSetup.NewGame(matchId.ToString("N"), slots.Select(s => new SeatSetup(s.UserId?.ToString() ?? $"bot-{s.Seat}", s.DisplayName, s.IsBot ? PlayerKind.Bot : PlayerKind.Remote)).ToList(),
-            RuleSet.ForMode(gameMode));
-        foreach (var slot in slots.Where(s => s.IsHuman)) slot.Gems = await wallet.GetGemsAsync(slot.UserId!.Value, ct);
+            RulesFor(mode, gameMode));
+        foreach (var slot in slots.Where(s => s.IsHuman)) await LoadPlayerDataAsync(slot, ct);
         var room = new MatchRoom
         {
             Id = matchId,
@@ -91,6 +95,45 @@ public sealed class MatchService(
         try { await BroadcastAsync(room); }
         finally { room.Gate.Release(); }
         return matchId;
+    }
+
+    /// <summary>
+    /// Server-chosen rules: the mode's standard rules, plus one boost per player in casual matchmaking and private tables.
+    /// Ranked league matches never allow boosts.
+    /// </summary>
+    public static RuleSet RulesFor(MatchMode mode, GameMode gameMode) =>
+        mode == MatchMode.Matchmaking ? RuleSet.ForMode(gameMode) : RuleSet.ForMode(gameMode) with { MaxBoosts = Boosts.PerMatchInCasual };
+
+    /// <summary>Refreshes the server-side caches of a human seat: gems, Shield bottles, chat setting.</summary>
+    private async Task LoadPlayerDataAsync(SeatSlot slot, CancellationToken ct = default)
+    {
+        var id = slot.UserId!.Value;
+        slot.Gems = await wallet.GetGemsAsync(id, ct);
+        slot.ShieldBottles = (await economy.GetBalancesAsync(id, ct))?.Count(Boosts.ShieldId) ?? 0;
+        slot.ChatEnabled = (await profiles.GetPrivacyAsync(id, ct)).ChatEnabled;
+    }
+
+    /// <summary>Applies a player's changed chat setting to their live match immediately.</summary>
+    public async Task OnChatSettingChangedAsync(Guid userId, bool enabled)
+    {
+        if (ActiveMatchFor(userId) is not Guid id || !_rooms.TryGetValue(id, out var room)) return;
+        await room.Gate.WaitAsync();
+        try { if (room.SeatOf(userId) is SeatSlot slot) slot.ChatEnabled = enabled; }
+        finally { room.Gate.Release(); }
+    }
+
+    /// <summary>Refreshes cached balances after a purchase so the match UI (reroll/boost buttons) is current.</summary>
+    public async Task OnBalancesChangedAsync(Guid userId)
+    {
+        if (ActiveMatchFor(userId) is not Guid id || !_rooms.TryGetValue(id, out var room)) return;
+        await room.Gate.WaitAsync();
+        try
+        {
+            if (room.Ended || room.SeatOf(userId) is not SeatSlot slot) return;
+            await LoadPlayerDataAsync(slot);
+            await notifier.SendSnapshotAsync(userId, room.SnapshotFor(userId));
+        }
+        finally { room.Gate.Release(); }
     }
 
     /// <summary>
@@ -175,6 +218,63 @@ public sealed class MatchService(
         return new RerollResult(Error(code, message), slot is null ? null : (int)slot.Gems, used, remaining, null);
     }
 
+    /// <summary>
+    /// Drinks a Shield bottle (see <see cref="GameEngine.UseShield"/> for the exact effect). Same safety model as rerolls:
+    /// rules are validated first, then one bottle is consumed through an idempotent economy operation keyed by match + request
+    /// id, and only then is the effect applied. Rejected in ranked matches; nothing is consumed when any check fails.
+    /// </summary>
+    public async Task<BoostResult> UseBoostAsync(Guid userId, string matchId, long expectedVersion, string requestId)
+    {
+        if (CommandValidator.ValidateRequestId(requestId) != ErrorCode.None) return BoostFail(ErrorCode.InvalidRequest, null, null, "Invalid request id.");
+        var room = Find(matchId);
+        if (room is null) return BoostFail(ErrorCode.UnknownMatch, null);
+        await room.Gate.WaitAsync();
+        try
+        {
+            var slot = room.SeatOf(userId);
+            if (slot is null || slot.Abandoned) return BoostFail(ErrorCode.NotInMatch, null);
+            var key = $"{userId:N}:{requestId}";
+            if (room.ProcessedBoosts.TryGetValue(key, out var previous)) return previous;
+            if (room.Ended) return BoostFail(ErrorCode.GameOver, slot, room);
+            if (room.IsRanked) return BoostFail(ErrorCode.BoostNotAllowed, slot, room, "Boosts are not allowed in ranked league matches.");
+            var versionError = CommandValidator.ValidateVersion(room.State, expectedVersion);
+            if (versionError != ErrorCode.None)
+            {
+                await notifier.SendSnapshotAsync(userId, room.SnapshotFor(userId));
+                return BoostFail(versionError, slot, room);
+            }
+            var ruleError = GameEngine.ValidateShield(room.State, slot.Seat);
+            if (ruleError != ErrorCode.None) return BoostFail(ruleError, slot, room);
+            if (slot.ShieldBottles < 1) return BoostFail(ErrorCode.NoBoostItem, slot, room);
+
+            var spend = await economy.ApplyAsync(new EconomyOperation(userId, $"boost:{room.Id:N}:{requestId}", Economy.Reasons.BoostUse,
+                new[] { new AssetChange(Boosts.ShieldId, -1) }, time.GetUtcNow(), room.Id));
+            slot.ShieldBottles = spend.Balances.Count(Boosts.ShieldId);
+            if (!spend.Ok) return BoostFail(ErrorCode.NoBoostItem, slot, room);
+
+            var result = GameEngine.UseShield(room.State, slot.Seat);
+            if (!result.Ok)
+            {
+                logger.LogError("Shield rejected after consumption in match {MatchId}: {Error}", room.Id, result.Error);
+                return BoostFail(result.Error, slot, room);
+            }
+            slot.MissedTurns = 0;
+            await CommitAsync(room, result);
+            var used = room.State.Players[slot.Seat].BoostsUsed;
+            var ok = new BoostResult(null, slot.ShieldBottles, used, Math.Max(0, room.State.Rules.MaxBoosts - used));
+            room.ProcessedBoosts[key] = ok;
+            return ok;
+        }
+        finally { room.Gate.Release(); }
+    }
+
+    private static BoostResult BoostFail(ErrorCode code, SeatSlot? slot, MatchRoom? room = null, string? message = null)
+    {
+        var used = slot is not null && room is not null ? room.State.Players[slot.Seat].BoostsUsed : 0;
+        var remaining = room is not null ? Math.Max(0, room.State.Rules.MaxBoosts - used) : 0;
+        return new BoostResult(Error(code, message), slot?.ShieldBottles, used, remaining);
+    }
+
     private async Task<ServerError?> HumanCommandAsync(Guid userId, string matchId, long expectedVersion, Func<MatchRoom, SeatSlot, EngineResult> action)
     {
         var room = Find(matchId);
@@ -244,9 +344,15 @@ public sealed class MatchService(
         {
             sender = room.SeatOf(userId);
             if (sender is null || sender.Abandoned) return Error(ErrorCode.NotInMatch);
-            if (now - sender.LastReactionAt < TimeSpan.FromSeconds(2)) return Error(ErrorCode.RateLimited);
+            if (!O.ChatEnabled) return Error(ErrorCode.ChatDisabled, "Chat is turned off on this server.");
+            if (!sender.ChatEnabled) return Error(ErrorCode.ChatDisabled, "Turn chat on in Settings to send messages.");
+            if (now - sender.LastReactionAt < TimeSpan.FromSeconds(Reactions.MinGapSeconds)) return Error(ErrorCode.RateLimited);
+            while (sender.RecentChats.Count > 0 && now - sender.RecentChats.Peek() > TimeSpan.FromSeconds(Reactions.WindowSeconds)) sender.RecentChats.Dequeue();
+            if (sender.RecentChats.Count >= Reactions.MaxPerWindow) return Error(ErrorCode.RateLimited, "You're sending messages too quickly. Wait a moment.");
             sender.LastReactionAt = now;
-            recipients = room.Humans.Where(h => !h.Abandoned).Select(h => h.UserId!.Value).ToList();
+            sender.RecentChats.Enqueue(now);
+            // Delivered to players still in the match who have chat on (and to the sender as confirmation).
+            recipients = room.Humans.Where(h => !h.Abandoned && (h.ChatEnabled || h.UserId == userId)).Select(h => h.UserId!.Value).ToList();
         }
         finally { room.Gate.Release(); }
 
@@ -374,10 +480,10 @@ public sealed class MatchService(
                     StartedAt = active.Match.StartedAt,
                     Bot = BotFactory.Create(BotDifficulty.Normal, new Random()),
                 };
-                foreach (var s in slots.Where(s => s.IsHuman)) s.Gems = await wallet.GetGemsAsync(s.UserId!.Value, ct);
+                foreach (var s in slots.Where(s => s.IsHuman)) await LoadPlayerDataAsync(s, ct);
                 var profileMap = await profiles.GetProfilesAsync(slots.Where(s => s.UserId is not null).Select(s => s.UserId!.Value), ct);
                 foreach (var s in slots.Where(s => s.UserId is not null))
-                    if (profileMap.TryGetValue(s.UserId!.Value, out var p)) s.AvatarId = p.AvatarId;
+                    if (profileMap.TryGetValue(s.UserId!.Value, out var p)) { s.AvatarId = p.AvatarId; s.PublicId = p.FriendCode; s.FrameId = p.FrameId; }
                 room.Deadline = ComputeDeadline(room, now);
                 _rooms[room.Id] = room;
                 foreach (var s in slots.Where(s => s.IsHuman)) _activeMatchByUser[s.UserId!.Value] = room.Id;
@@ -489,6 +595,23 @@ public sealed class MatchService(
         room.FinalStandings = standings;
         var humanCount = room.Humans.Count();
 
+        // League points: ranked matchmaking only, with at least two human players, in an active season.
+        SeasonRecord? season = null;
+        if (room.IsRanked && humanCount >= LeagueRules.MinHumansForPoints && league is not null)
+        {
+            try
+            {
+                season = await league.GetActiveSeasonAsync();
+                if (season is not null)
+                    foreach (var h in room.Humans) await league.EnsureStandingAsync(season.Id, h.UserId!.Value);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "League placement failed for match {MatchId}; result recorded without league points", room.Id);
+                season = null;
+            }
+        }
+
         var outcomes = room.Seats.Select(slot =>
         {
             var placement = standings.ToList().IndexOf(slot.Seat) + 1;
@@ -497,13 +620,15 @@ public sealed class MatchService(
                 : ParticipantResult.Loss;
             var (coins, xp) = slot.IsHuman ? RewardPolicy.For(room.Mode, room.Seats.Length, placement, result, humanCount) : (0, 0);
             var gems = slot.IsHuman ? RewardPolicy.GemsFor(room.Mode, placement, result) : 0;
-            return new ParticipantOutcome(slot.Seat, slot.UserId, placement, result, coins, xp, slot.Captures, gems, room.State.Players[slot.Seat].RerollsUsed);
+            int? leaguePoints = season is not null && slot.IsHuman ? LeagueRules.PointsFor(room.Seats.Length, placement, result) : null;
+            return new ParticipantOutcome(slot.Seat, slot.UserId, placement, result, coins, xp, slot.Captures, gems, room.State.Players[slot.Seat].RerollsUsed,
+                room.State.Players[slot.Seat].BoostsUsed, leaguePoints);
         }).ToList();
 
         var winnerSlot = room.State.WinnerSeat is int w ? room.Seats[w] : null;
         var completion = new MatchCompletion(room.Id, status, now,
             winnerSlot is { IsHuman: true, Abandoned: false } ? winnerSlot.UserId : null,
-            GameStateSerializer.Serialize(room.State), outcomes, room.Seats.Length);
+            GameStateSerializer.Serialize(room.State), outcomes, room.Seats.Length, room.State.Mode, season?.Id);
 
         try { await store.CompleteMatchAsync(completion); }
         catch (Exception ex) { logger.LogError(ex, "Failed to record result for match {MatchId}", room.Id); }
@@ -512,7 +637,8 @@ public sealed class MatchService(
 
         await BroadcastAsync(room);
         foreach (var o in outcomes.Where(o => o.UserId is not null && !room.Seats[o.Seat].Abandoned))
-            await notifier.SendMatchEndedAsync(o.UserId!.Value, new MatchEndedInfo(room.MatchIdString, standings, o.Placement, o.CoinsAwarded, o.XpAwarded, reason, o.GemsAwarded, room.State.Mode));
+            await notifier.SendMatchEndedAsync(o.UserId!.Value, new MatchEndedInfo(room.MatchIdString, standings, o.Placement, o.CoinsAwarded, o.XpAwarded, reason, o.GemsAwarded, room.State.Mode,
+                o.LeaguePoints, room.Queue, room.Mode == MatchMode.Private));
         logger.LogInformation("Match {MatchId} ended ({Reason}), winner seat {Winner}", room.Id, reason, room.State.WinnerSeat);
     }
 
@@ -555,6 +681,10 @@ public sealed class MatchService(
         ErrorCode.InsufficientGems => "Not enough gems for a reroll.",
         ErrorCode.RerollNotAllowed => "You can only reroll a roll you haven't used yet.",
         ErrorCode.InvalidMode => "That game mode isn't available.",
+        ErrorCode.BoostNotAllowed => "A Shield can only be used at the start of your turn, before rolling, in casual matches.",
+        ErrorCode.NoBoostsLeft => "You've already used this match's boost.",
+        ErrorCode.NoBoostItem => "You don't have a Shield bottle. Get one in the Store.",
+        ErrorCode.ChatDisabled => "Chat is turned off.",
         _ => "Request rejected.",
     });
 }

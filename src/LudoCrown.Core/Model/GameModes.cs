@@ -67,3 +67,16 @@ public static class GameModes
         return Enum.TryParse<GameMode>(value.Trim(), ignoreCase: true, out var mode) && IsAvailable(mode) ? mode : null;
     }
 }
+
+/// <summary>Boost bottles: inventory items that give a small, temporary, clearly described advantage in casual matches.</summary>
+public static class Boosts
+{
+    public const string ShieldId = "boost_shield";
+    public const string ShieldName = "Shield Bottle";
+    public const string ShieldEffect =
+        "Drink before rolling on your turn. Until your next turn starts, none of your pieces can be captured — " +
+        "opponents who land on them just share the square. Dice, moves and turn order are unchanged.";
+    public const string ShieldLimits = "1 per match. Casual matches and private tables only — never in ranked league matches or offline.";
+    /// <summary>Boosts per player per match where boosts are allowed.</summary>
+    public const int PerMatchInCasual = 1;
+}
