@@ -37,5 +37,9 @@ public static class GameStateSerializer
         }
         if (s.Phase == GamePhase.AwaitingMove && s.PendingRoll is not (>= 1 and <= 6)) throw new JsonException("Missing pending roll.");
         if (s.Players.Select(p => p.Color).Distinct().Count() != s.Players.Count) throw new JsonException("Duplicate colours.");
+        if (!GameModes.IsAvailable(s.Rules.Mode)) throw new JsonException("Unknown game mode.");
+        if (s.Rules.PiecesToWin is < 1 or > Board.BoardGeometry.PiecesPerPlayer) throw new JsonException("Invalid win condition.");
+        if (s.Rules.MaxRerolls is < 0 or > 20) throw new JsonException("Invalid reroll limit.");
+        if (s.Players.Any(p => p.RerollsUsed < 0 || p.RerollsUsed > s.Rules.MaxRerolls)) throw new JsonException("Invalid reroll count.");
     }
 }

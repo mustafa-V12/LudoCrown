@@ -12,15 +12,20 @@ namespace LudoCrown.Core.Engine;
 public static class GameEngine
 {
     /// <summary>Rolls the die for <paramref name="seat"/> using <paramref name="dice"/>.</summary>
-    public static EngineResult Roll(GameState state, int seat, IDiceRoller dice)
+    /// <param name="holdWhenNoMoves">
+    /// When true and the roll gives no legal move, the turn is NOT passed automatically: the state stays in
+    /// AwaitingMove with no legal pieces so the player can choose to <see cref="Reroll"/> (gem) or <see cref="Pass"/>.
+    /// The online server sets this only when the player can actually afford a reroll.
+    /// </param>
+    public static EngineResult Roll(GameState state, int seat, IDiceRoller dice, bool holdWhenNoMoves = false)
     {
         var error = ValidateTurn(state, seat, GamePhase.AwaitingRoll);
         if (error != ErrorCode.None) return EngineResult.Fail(state, error);
-        return ApplyRoll(state, seat, dice.Roll());
+        return ApplyRoll(state, seat, dice.Roll(), holdWhenNoMoves);
     }
 
     /// <summary>Applies a specific die value. Only trusted code (the engine host / server / tests) may call this.</summary>
-    public static EngineResult ApplyRoll(GameState state, int seat, int value)
+    public static EngineResult ApplyRoll(GameState state, int seat, int value, bool holdWhenNoMoves = false)
     {
         var error = ValidateTurn(state, seat, GamePhase.AwaitingRoll);
         if (error != ErrorCode.None) return EngineResult.Fail(state, error);
@@ -28,27 +33,85 @@ public static class GameEngine
 
         var next = state.Clone();
         var events = new List<GameEvent> { new(GameEventType.DiceRolled, seat, Value: value) };
-        next.LastRoll = value;
+        next.SixesBeforePendingRoll = state.ConsecutiveSixes;
         next.ConsecutiveSixes = value == 6 ? state.ConsecutiveSixes + 1 : 0;
+        ResolveRoll(next, seat, value, holdWhenNoMoves, events);
+        return Done(next, events);
+    }
 
+    /// <summary>
+    /// Gem reroll: REPLACES the current, not-yet-used roll with a new die value. Allowed only for the current
+    /// player while a roll is pending (before a piece has been moved) and while the player has rerolls left in this
+    /// mode. Gem payment is handled by the caller (the server) — the engine only enforces the game rules.
+    /// </summary>
+    public static EngineResult Reroll(GameState state, int seat, IDiceRoller dice, bool holdWhenNoMoves = false)
+    {
+        var error = ValidateReroll(state, seat);
+        if (error != ErrorCode.None) return EngineResult.Fail(state, error);
+        return ApplyReroll(state, seat, dice.Roll(), holdWhenNoMoves);
+    }
+
+    public static EngineResult ApplyReroll(GameState state, int seat, int value, bool holdWhenNoMoves = false)
+    {
+        var error = ValidateReroll(state, seat);
+        if (error != ErrorCode.None) return EngineResult.Fail(state, error);
+        if (value is < 1 or > 6) throw new ArgumentOutOfRangeException(nameof(value));
+
+        var next = state.Clone();
+        var old = state.PendingRoll!.Value;
+        next.CurrentPlayer.RerollsUsed++;
+        // The new value counts exactly as if it had been the original roll (the replaced roll is forgotten).
+        next.ConsecutiveSixes = value == 6 ? state.SixesBeforePendingRoll + 1 : 0;
+        var events = new List<GameEvent> { new(GameEventType.DiceRerolled, seat, From: old, Value: value) };
+        ResolveRoll(next, seat, value, holdWhenNoMoves, events);
+        return Done(next, events);
+    }
+
+    /// <summary>Whether a reroll is allowed by the rules right now (ignores gem balance, which the server checks).</summary>
+    public static ErrorCode ValidateReroll(GameState state, int seat)
+    {
+        if (state.Phase == GamePhase.Finished) return ErrorCode.GameOver;
+        if (state.CurrentPlayer.Seat != seat) return ErrorCode.NotYourTurn;
+        if (state.Phase != GamePhase.AwaitingMove || state.PendingRoll is null) return ErrorCode.RerollNotAllowed;
+        if (state.CurrentPlayer.RerollsUsed >= state.Rules.MaxRerolls) return ErrorCode.NoRerollsLeft;
+        return ErrorCode.None;
+    }
+
+    /// <summary>Ends the turn when the pending roll has no legal move (used after a held roll).</summary>
+    public static EngineResult Pass(GameState state, int seat)
+    {
+        var error = ValidateTurn(state, seat, GamePhase.AwaitingMove);
+        if (error != ErrorCode.None) return EngineResult.Fail(state, error);
+        if (GetLegalMoves(state).Count > 0) return EngineResult.Fail(state, ErrorCode.IllegalMove);
+        var next = state.Clone();
+        var events = new List<GameEvent> { new(GameEventType.NoLegalMoves, seat, Value: state.PendingRoll ?? 0) };
+        PassTurn(next, events);
+        return Done(next, events);
+    }
+
+    /// <summary>True when the current player has a pending roll with no legal move (a held roll).</summary>
+    public static bool IsHeldWithoutMoves(GameState state) =>
+        state.Phase == GamePhase.AwaitingMove && state.PendingRoll is not null && GetLegalMoves(state).Count == 0;
+
+    private static void ResolveRoll(GameState next, int seat, int value, bool holdWhenNoMoves, List<GameEvent> events)
+    {
+        next.LastRoll = value;
         if (value == 6 && next.ConsecutiveSixes >= 3 && next.Rules.ThreeSixesForfeitsTurn)
         {
             events.Add(new GameEvent(GameEventType.ThreeSixesForfeit, seat, Value: value));
             PassTurn(next, events);
-            return Done(next, events);
+            return;
         }
 
         next.PendingRoll = value;
         next.Phase = GamePhase.AwaitingMove;
 
-        if (GetLegalMoves(next).Count == 0)
+        if (GetLegalMoves(next).Count == 0 && !holdWhenNoMoves)
         {
             // Documented rule: with no legal move the turn passes, even after a 6.
             events.Add(new GameEvent(GameEventType.NoLegalMoves, seat, Value: value));
             PassTurn(next, events);
         }
-
-        return Done(next, events);
     }
 
     /// <summary>Legal moves for the current player and pending roll. Empty when not awaiting a move.</summary>
@@ -112,7 +175,7 @@ public static class GameEngine
 
         next.PendingRoll = null;
 
-        if (player.HasFinished)
+        if (next.HasWon(player))
         {
             next.Phase = GamePhase.Finished;
             next.WinnerSeat = player.Seat;

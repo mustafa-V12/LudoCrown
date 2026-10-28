@@ -12,6 +12,8 @@ public sealed class PlayerState
     /// <summary>Opaque player id: an account id online, or a local id offline.</summary>
     public string PlayerId { get; set; } = "";
     public int[] Pieces { get; set; } = Enumerable.Repeat(BoardGeometry.Yard, BoardGeometry.PiecesPerPlayer).ToArray();
+    /// <summary>Gem rerolls this player has used in this match (limited by <see cref="RuleSet.MaxRerolls"/>).</summary>
+    public int RerollsUsed { get; set; }
 
     public bool HasFinished => Pieces.All(p => p == BoardGeometry.FinishedProgress);
     public int FinishedCount => Pieces.Count(p => p == BoardGeometry.FinishedProgress);
@@ -26,6 +28,7 @@ public sealed class PlayerState
         Kind = Kind,
         PlayerId = PlayerId,
         Pieces = (int[])Pieces.Clone(),
+        RerollsUsed = RerollsUsed,
     };
 }
 
@@ -46,12 +49,21 @@ public sealed class GameState
     /// <summary>The most recent die value, kept for display after the move is made.</summary>
     public int? LastRoll { get; set; }
     public int ConsecutiveSixes { get; set; }
+    /// <summary>The run of sixes before the pending roll, so a reroll counts exactly as if it were the original roll.</summary>
+    public int SixesBeforePendingRoll { get; set; }
     public int TurnNumber { get; set; } = 1;
     /// <summary>Monotonic version. Online clients send the version they acted on to reject stale commands.</summary>
     public long Version { get; set; }
     public int? WinnerSeat { get; set; }
 
     public PlayerState CurrentPlayer => Players[CurrentPlayerIndex];
+
+    public GameMode Mode => Rules.Mode;
+
+    /// <summary>True when the player has met the mode's win condition (4 pieces in Classic, 1 in Quick).</summary>
+    public bool HasWon(PlayerState p) => p.FinishedCount >= Rules.PiecesToWin;
+
+    public int RerollsRemaining(PlayerState p) => Math.Max(0, Rules.MaxRerolls - p.RerollsUsed);
 
     public PlayerState? PlayerBySeat(int seat) => Players.FirstOrDefault(p => p.Seat == seat);
 
@@ -65,6 +77,7 @@ public sealed class GameState
         PendingRoll = PendingRoll,
         LastRoll = LastRoll,
         ConsecutiveSixes = ConsecutiveSixes,
+        SixesBeforePendingRoll = SixesBeforePendingRoll,
         TurnNumber = TurnNumber,
         Version = Version,
         WinnerSeat = WinnerSeat,

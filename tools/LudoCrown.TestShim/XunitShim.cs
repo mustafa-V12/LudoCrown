@@ -17,7 +17,7 @@ namespace Xunit
     [AttributeUsage(AttributeTargets.Method, AllowMultiple = true)]
     public sealed class InlineDataAttribute(params object?[] data) : Attribute
     {
-        public object?[] Data { get; } = data;
+        public object?[] Data { get; } = data ?? new object?[] { null };
     }
 
     [AttributeUsage(AttributeTargets.Method, AllowMultiple = true)]

@@ -3,6 +3,8 @@ namespace LudoCrown.Core.Engine;
 public enum GameEventType
 {
     DiceRolled,
+    /// <summary>The pending roll was replaced by a gem reroll. From = old value, Value = new value.</summary>
+    DiceRerolled,
     NoLegalMoves,
     ThreeSixesForfeit,
     PieceEntered,
@@ -37,6 +39,14 @@ public enum ErrorCode
     RateLimited,
     InvalidRequest,
     Unauthorized,
+    /// <summary>The player has used all rerolls allowed in this mode.</summary>
+    NoRerollsLeft,
+    /// <summary>Not enough gems for a reroll.</summary>
+    InsufficientGems,
+    /// <summary>Reroll is not possible right now (e.g. no roll to replace, or the move was already made).</summary>
+    RerollNotAllowed,
+    /// <summary>The mode is unknown or not available.</summary>
+    InvalidMode,
 }
 
 public sealed record EngineResult(bool Ok, Model.GameState State, IReadOnlyList<GameEvent> Events, ErrorCode Error = ErrorCode.None)
