@@ -75,7 +75,7 @@ public sealed class MatchOptions
     /// Decision window after a roll with no legal move when the player could pay for a reroll. The roll is held so
     /// they can reroll (gem) or pass; when the window ends it is passed automatically (not counted as a missed turn).
     /// </summary>
-    public double HeldRollSeconds { get; set; } = 5;
+    public double HeldRollSeconds { get; set; } = 10;
     /// <summary>Server-wide switch for in-match quick chat (moderation kill switch). Players can also turn chat off for themselves.</summary>
     public bool ChatEnabled { get; set; } = true;
     /// <summary>Pause before bots act, so moves are readable.</summary>

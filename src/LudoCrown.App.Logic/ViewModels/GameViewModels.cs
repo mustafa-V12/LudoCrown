@@ -252,8 +252,9 @@ public sealed class GameViewModel : ViewModelBase
         if (seat.IsLocalHuman)
         {
             var who = b.Seats.Count(s => s.IsLocalHuman) > 1 ? $"{seat.Name}, " : "";
-            if (b.CanPass) return $"{who}no move with {b.PendingRoll} — reroll or pass";
-            return b.Phase == GamePhase.AwaitingRoll ? $"{who}your turn — roll the die" : $"{who}tap a glowing piece to move {b.PendingRoll}";
+            var text = b.CanPass ? $"no move with {b.PendingRoll} — reroll or pass"
+                : b.Phase == GamePhase.AwaitingRoll ? "your turn — roll the die" : $"tap a glowing piece to move {b.PendingRoll}";
+            return who.Length > 0 ? who + text : char.ToUpperInvariant(text[0]) + text[1..];
         }
         if (!seat.IsConnected) return $"{seat.Name} is reconnecting…";
         return seat.IsBot ? $"{seat.Name} is thinking…" : $"{seat.Name}'s turn";
@@ -355,11 +356,17 @@ public sealed class ResultsViewModel : ViewModelBase
         }
         var winner = Rows[0];
         Won = _result.YourPlacement == 1;
-        Title = _result.Reason == "abandoned" ? "Match ended"
+        Title = _result.Reason == MatchEndReasons.RemovedInactive ? "Removed for inactivity"
+            : _result.Reason == MatchEndReasons.RemovedDisconnected ? "Disconnected too long"
+            : _result.Reason == "abandoned" ? "Match ended"
             : _result.YourPlacement is int p ? (p == 1 ? "You won the crown!" : $"You finished {Rows[p - 1].PlacementText}")
             : $"{winner.Name} wins!";
         var info = GameModes.Get(_result.Mode);
         Subtitle = _result.IsOnline ? $"{MatchLabels.Kind(_result.Kind)} · {info.Name}" : $"Offline game · {info.Name}";
+        if (_result.Reason is MatchEndReasons.RemovedInactive or MatchEndReasons.RemovedDisconnected)
+            Subtitle += _result.Reason == MatchEndReasons.RemovedInactive
+                ? " — a bot took your seat after 3 turns ran out. No rewards for this match."
+                : " — a bot took your seat after 90 seconds offline. No rewards for this match.";
         ModeText = $"{info.Name}: {info.WinCondition}";
         HasRewards = _result.CoinsAwarded > 0 || _result.XpAwarded > 0 || _result.GemsAwarded > 0;
         RewardsText = HasRewards ? string.Join("   ", new[]

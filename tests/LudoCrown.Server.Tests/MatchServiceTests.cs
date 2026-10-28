@@ -108,6 +108,10 @@ public class MatchServiceTests
         Assert.True(room.Seats[0].Abandoned);
         Assert.Null(h.Matches.ActiveMatchFor(a));
         Assert.True(h.Notifier.LastSnapshot(b)!.Seats[0].IsBot);
+        // The removed player is told, instead of being left looking at a turn they can no longer play.
+        var told = Assert.Single(h.Notifier.Ended, e => e.User == a);
+        Assert.Equal(LudoCrown.Core.Protocol.MatchEndReasons.RemovedInactive, told.Info.Reason);
+        Assert.Equal(0, told.Info.CoinsAwarded);
     }
 
     [Fact]

@@ -576,6 +576,13 @@ public sealed class MatchService(
         _activeMatchByUser.TryRemove(slot.UserId!.Value, out _);
         logger.LogInformation("Seat {Seat} in match {MatchId} abandoned ({Reason})", slot.Seat, room.Id, reason);
 
+        // A player removed by the server (idle or offline too long) is told so; otherwise their screen would keep showing
+        // a turn they can no longer play. They get no rewards; the abandon counts when the match is recorded.
+        if (reason is "inactive" or "disconnected")
+            await notifier.SendMatchEndedAsync(slot.UserId!.Value, new MatchEndedInfo(room.MatchIdString, room.State.Standings(), 0, 0, 0,
+                reason == "inactive" ? MatchEndReasons.RemovedInactive : MatchEndReasons.RemovedDisconnected, 0, room.State.Mode,
+                null, room.Queue, room.Mode == MatchMode.Private));
+
         if (room.Humans.All(h => h.Abandoned))
         {
             await CompleteAsync(room, MatchStatus.Abandoned, "abandoned");

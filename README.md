@@ -113,6 +113,18 @@ The three run modes are kept clearly apart. The app shows which one you're in: a
   - Play a ranked or casual match against the bots, try the store sandbox, and open the league.
 - An automated end-to-end check is in `tools/smoke`: `npm install`, then `node smoke.mjs http://localhost:5080`.
 
+### Windows without Visual Studio (scripts in `tools/windows`)
+
+Double-click these in File Explorer. Each one writes a log next to itself.
+
+| Script | What it does |
+|---|---|
+| `install-sdk.cmd` | Installs the .NET 10 SDK (winget) and the MAUI Windows workload. Asks for administrator rights. Run once. |
+| `build-and-test.cmd` | Runs all four test projects, then builds the server and the Windows app. Log: `build-log.txt` |
+| `run-dev.cmd` | Builds the Windows app, (re)starts the development server on <http://localhost:5080> (in-memory data), and starts the app. Logs: `run-log.txt`, `server-log.txt`, `app-log.txt` (navigation and errors) |
+
+To build only the Windows app (no iOS or Android workloads needed): `dotnet build src/LudoCrown.Mobile -p:LudoWindowsOnly=true -f net10.0-windows10.0.19041.0`. Windows builds run unpackaged, so `bin\Debug\net10.0-windows10.0.19041.0\win-x64\LudoCrown.Mobile.exe` starts directly.
+
 ### Use PostgreSQL locally
 
 **With Docker:**
@@ -147,7 +159,7 @@ Server settings live in `src/LudoCrown.Server/appsettings.json`, which contains 
 | `Jwt:SigningKey` | Base64 key of at least 32 bytes for access tokens. **Required outside Development.** |
 | `Auth:PublicBaseUrl` | The server's public HTTPS URL, used for Google and Facebook OAuth redirects |
 | `Auth:Apple:*`, `Auth:Google:*`, `Auth:Facebook:*`, `Auth:Email:*` | Sign-in providers. Each provider is enabled only when it is configured; the app hides buttons for disabled providers. |
-| `Match:*` | Turn timer (20 s), disconnect grace period (90 s), missed-turn limit (3), bot fill wait (30 s), held-roll window (5 s), `ChatEnabled` |
+| `Match:*` | Turn timer (20 s), disconnect grace period (90 s), missed-turn limit (3), bot fill wait (30 s), held-roll window (10 s), `ChatEnabled` |
 | `Store:*` | App Store product ID prefix and App Store Server API keys (see [docs/STORE.md](docs/STORE.md)). `Store:DevSandbox` works in Development only. |
 | `League:*` | `Enabled`, `SeasonDays` (see [docs/LEAGUE.md](docs/LEAGUE.md)) |
 | `DevTools:AllowGemGrant` | Development only: enables the `/dev/*` endpoints (test currency, ending a season). Ignored in other environments. |

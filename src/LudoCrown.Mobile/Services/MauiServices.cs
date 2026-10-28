@@ -34,9 +34,20 @@ public sealed class MauiSettingsStore : ISettingsStore
 
 public sealed class ShellNavigationService : INavigationService
 {
-    public Task GoToAsync(string route) => MainThread.InvokeOnMainThreadAsync(() => Shell.Current.GoToAsync(route));
-    public Task GoBackAsync() => MainThread.InvokeOnMainThreadAsync(() => Shell.Current.GoToAsync(".."));
-    public Task ReplaceAsync(string route) => MainThread.InvokeOnMainThreadAsync(() => Shell.Current.GoToAsync($"../{route}"));
+    public Task GoToAsync(string route) => Go(route);
+    public Task GoBackAsync() => Go("..");
+    public Task ReplaceAsync(string route) => Go($"../{route}");
+
+    private static Task Go(string route) => MainThread.InvokeOnMainThreadAsync(async () =>
+    {
+        DevLog.Write($"Navigate {Shell.Current.CurrentState.Location} -> {route}");
+        try { await Shell.Current.GoToAsync(route); }
+        catch (Exception ex)
+        {
+            DevLog.Write($"Navigation to {route} failed: {ex}");
+            throw;
+        }
+    });
 }
 
 public sealed class MauiDialogService : IDialogService

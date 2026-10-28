@@ -292,8 +292,8 @@ public class ViewModelTests
     {
         var seats = new[] { new SeatView(0, PlayerColor.Ruby, "You", "crown", false, true, true, 0), new SeatView(1, PlayerColor.Topaz, "Baron", "knight", true, true, false, 0) };
         BoardState B(int seat, GamePhase phase, int? roll = null) => new("x", 1, phase, seat, roll, roll, new[] { new int[4], new int[4] }, seats, Array.Empty<Core.Engine.GameEvent>(), null, Array.Empty<int>(), null, false);
-        Assert.Equal("your turn — roll the die", GameViewModel.StatusFor(B(0, GamePhase.AwaitingRoll)));
-        Assert.Equal("tap a glowing piece to move 6", GameViewModel.StatusFor(B(0, GamePhase.AwaitingMove, 6)));
+        Assert.Equal("Your turn — roll the die", GameViewModel.StatusFor(B(0, GamePhase.AwaitingRoll)));
+        Assert.Equal("Tap a glowing piece to move 6", GameViewModel.StatusFor(B(0, GamePhase.AwaitingMove, 6)));
         Assert.Equal("Baron is thinking…", GameViewModel.StatusFor(B(1, GamePhase.AwaitingRoll)));
     }
 

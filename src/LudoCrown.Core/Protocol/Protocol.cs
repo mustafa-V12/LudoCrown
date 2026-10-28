@@ -131,6 +131,17 @@ public sealed record MatchmakingStatus(MatchmakingState State, int PlayerCount, 
 public sealed record MatchEndedInfo(string MatchId, IReadOnlyList<int> Standings, int YourPlacement, int CoinsAwarded, int XpAwarded, string Reason, int GemsAwarded = 0, GameMode Mode = GameMode.Classic,
     int? LeaguePoints = null, MatchQueue Queue = MatchQueue.Ranked, bool IsPrivate = false);
 
+/// <summary>Values of <see cref="MatchEndedInfo.Reason"/>.</summary>
+public static class MatchEndReasons
+{
+    public const string Won = "won";
+    public const string Abandoned = "abandoned";
+    /// <summary>Sent only to a player the server removed after repeated timed-out turns. A bot took the seat.</summary>
+    public const string RemovedInactive = "removed_inactive";
+    /// <summary>Sent only to a player the server removed after being offline longer than the grace period.</summary>
+    public const string RemovedDisconnected = "removed_disconnected";
+}
+
 public sealed record ServerError(ErrorCode Code, string Message);
 
 /// <summary>Result of a hub call that returns a value or an error.</summary>

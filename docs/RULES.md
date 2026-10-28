@@ -48,7 +48,7 @@ All other rules (entering, movement, captures, safe squares, extra turns) are id
 - **Who decides:** the server rolls the new value. It **replaces** the pending roll; there is no choosing between the two.
   - If the new value is a 6, it counts exactly as if it had been your original roll: extra turn, and the three-6s rule.
 - **Retries:** each request carries a request ID. A retried or duplicated request returns the same result and is never charged twice, even across reconnects or a server restart.
-- **No legal move:** if you could reroll and the roll has no legal move, the server holds the roll for **5 seconds**. In that time you can reroll or pass. After 5 seconds it passes for you. This does not count as a missed turn.
+- **No legal move:** if you could reroll and the roll has no legal move, the server holds the roll for **10 seconds**. In that time you can reroll or pass. After 10 seconds it passes for you. This does not count as a missed turn.
   - With no gems or rerolls left, a roll without moves passes immediately, as before.
 - The game shows your gem balance, rerolls used and remaining, the cost, and why a reroll is unavailable.
 - **Offline games have no rerolls**, because gems belong to your online account. The offline screen explains this.

@@ -209,8 +209,8 @@ public class RerollServerTests
         h.Dice.Enqueue(3);
         await h.Matches.RollAsync(a, id.ToString("N"), room.State.Version);
         Assert.Equal(0, room.State.CurrentPlayer.Seat);
-        await h.TickAsync(TimeSpan.FromSeconds(4));
-        Assert.Equal(0, room.State.CurrentPlayer.Seat);  // still inside the 5 s decision window
+        await h.TickAsync(TimeSpan.FromSeconds(9));
+        Assert.Equal(0, room.State.CurrentPlayer.Seat);  // still inside the 10 s decision window
         await h.TickAsync(TimeSpan.FromSeconds(2));
         Assert.Equal(1, room.State.CurrentPlayer.Seat);  // passed automatically
         Assert.Equal(0, room.Seats[0].MissedTurns);       // not counted as a missed turn

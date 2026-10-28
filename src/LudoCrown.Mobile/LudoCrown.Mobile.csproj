@@ -10,6 +10,10 @@
   <PropertyGroup>
     <TargetFrameworks>net10.0-ios;net10.0-android</TargetFrameworks>
     <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net10.0-windows10.0.19041.0</TargetFrameworks>
+    <!-- Build only the Windows app (no iOS/Android workloads needed): dotnet build -p:LudoWindowsOnly=true -f net10.0-windows10.0.19041.0 -->
+    <TargetFrameworks Condition="'$(LudoWindowsOnly)' == 'true'">net10.0-windows10.0.19041.0</TargetFrameworks>
+    <!-- Windows dev builds run unpackaged, so bin\...\LudoCrown.Mobile.exe starts directly (no MSIX deployment). -->
+    <WindowsPackageType Condition="$(TargetFramework.Contains('-windows'))">None</WindowsPackageType>
     <OutputType>Exe</OutputType>
     <RootNamespace>LudoCrown.Mobile</RootNamespace>
     <UseMaui>true</UseMaui>
@@ -60,7 +64,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
-    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.13" />
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
   </ItemGroup>
 

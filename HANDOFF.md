@@ -13,27 +13,29 @@
 | PostgreSQL: migrations 0001–0003 + down scripts | **Implemented** | Applied to PostgreSQL 16: all up, 0003 and 0002 down, all up again; all 99 SQL statements validated with PREPARE; 24 integration tests against the real database, including the full purchase flow with constraints |
 | Full online flow | **Working** (Development server + PostgreSQL) | `tools/smoke/smoke.mjs`, 30 checks passed: sandbox purchases (success, duplicate, other account, pending→credited, failure); gold buy retry; ranked Classic match with 3 rerolls including a retried request (gem arithmetic checked against the ledger); boost rejected in ranked; held-roll passes; casual Quick match with a Shield seen by the opponent; quick chat delivered; per-mode stats; profile privacy; league points; season end with a single reward |
 | App logic (view models, sessions) | **Implemented** | 54 app tests: mode picker, reroll/pass/boost states and texts, store states (pending, cancel, failure, sandbox, recovery), league and profile screens, environment labels |
-| iPhone/Windows app (`LudoCrown.Mobile`, MAUI) | **Written, NOT compiled** | Pages and bindings checked against the view models by script; XAML and the iOS privacy manifest parse. The MAUI build needs Visual Studio with the MAUI workload. iOS and StoreKit also need a Mac. |
+| Windows app (`LudoCrown.Mobile`, MAUI, net10.0-windows) | **Builds and runs on your PC** | Built with .NET SDK 10.0.403 + MAUI workload on your Windows PC (one compile error fixed). Tested by hand against the local development server:<br>- guest sign-in, and a graceful return to sign-in after a server restart<br>- Classic/Quick picker with rules; ranked/casual<br>- offline game<br>- online Quick match with bots<br>- held roll → reroll ×2 (gems 30 → 28, rerolls 2/5) → pass<br>- Shield (visible on the badge, 3 → 2 bottles)<br>- quick chat panel<br>- results screen (removed for inactivity)<br>- dev test currency<br>- store sandbox purchase (+50 gems)<br>- league screen; settings with privacy and chat switches<br>Screens: `docs/windows-test.jpg` |
+| iPhone app (net10.0-ios, StoreKit) | **Written, NOT compiled** | Needs a Mac with Xcode (Pair to Mac) and the iOS workload. StoreKit purchases need Apple sandbox testing on a device. |
 
-**Test totals in the build environment: 343 passed, 0 failed** (Core 88, Server 121, App 54, PostgreSQL 24 test methods, plus theory cases). They ran through `tools/LudoCrown.TestShim` because nuget.org was unreachable. In Visual Studio, use Test Explorer.
+**Tests:**
+- **On your Windows PC**, with the real xUnit and NuGet packages: Core 128, Server 134, App 57, PostgreSQL 24, all passing. The PostgreSQL tests return early there, because no database is set up on the PC. Server and app tests were rerun after the final fixes.
+- **In the build environment**, against a real PostgreSQL 16, through `tools/LudoCrown.TestShim`: 343 passing. This includes the database tests and the end-to-end smoke test.
 
 ## Decisions you made during development
 - Gems, bought or earned, can be used for rerolls in **all** matches, ranked league matches included: 7 per Classic match, 5 per Quick match.
 - Boost bottles: only in the new **casual** queue and in private tables.
 
 ## What still needs you
-1. **Build the app in Visual Studio on Windows.** It has not been compiled. Small compile errors in `LudoCrown.Mobile` are likely; send me the error list.
-2. **Mac / iOS:** simulator and device testing, signing, archive, TestFlight.
-3. **Apple:**
+1. **Mac / iOS:** simulator and device testing, signing, archive, TestFlight.
+2. **Apple:**
    - Developer Program membership and a bundle ID with Sign in with Apple and In-App Purchase
    - the Paid Applications agreement
    - the 6 products in App Store Connect
    - an In-App Purchase key
    - the server notification URL
    - sandbox testers
-4. **Hosting** for the server, plus a managed PostgreSQL and a domain with HTTPS.
-5. **Provider credentials** (Google, Facebook, SMTP), if you want those sign-in methods.
-6. **Your information:** privacy policy URL, support URL and email, App Store listing text and screenshots.
+3. **Hosting** for the server, plus a managed PostgreSQL and a domain with HTTPS.
+4. **Provider credentials** (Google, Facebook, SMTP), if you want those sign-in methods.
+5. **Your information:** privacy policy URL, support URL and email, App Store listing text and screenshots.
 
 Placeholders to replace:
 
@@ -51,18 +53,16 @@ Placeholders to replace:
 - the app has been tested on an iPhone.
 
 ## Exact next steps (Windows)
-1. Open `Documents\LudoCrown\LudoCrown.sln` in Visual Studio 2022/2026. It needs the **.NET Multi-platform App UI** and **ASP.NET and web development** workloads, plus the .NET 10 SDK.
-2. **Build → Rebuild Solution**, then **Test → Run All Tests**.
-3. Start **LudoCrown.Server** (F5) and check <http://localhost:5080/info>. It should show `environment: Development`.
-   - For PostgreSQL, see README → *Use PostgreSQL locally*. Migrations run automatically in Development.
-4. Run **LudoCrown.Mobile** on **Windows Machine** and try:
-   1. *Play offline*: Classic and Quick against bots.
-   2. *Play as guest* → Settings → Development → *Add test gold, gems & Shields*.
-   3. Home → choose a mode and Ranked → *Play online*. Bots join after 10 seconds. Roll, then try a reroll.
-   4. Casual → drink a Shield before rolling.
-   5. Store: buy with gold, and use the sandbox for gem packs (success, pending, failure).
-   6. The League screen, and tap a player for their profile.
-5. Optional end-to-end check: `cd tools\smoke`, then `npm install`, then `node smoke.mjs http://localhost:5080`.
+The .NET 10 SDK and the MAUI Windows workload are now installed on your PC. Visual Studio isn't required.
+
+1. In File Explorer, open `Documents\LudoCrown\tools\windows`.
+2. Double-click **`run-dev.cmd`**. It builds the app, starts the local development server and opens Ludo Crown.
+   - Try *Play as guest*, then Settings → Development → *Add test currency*.
+   - Choose Quick or Classic and Ranked or Casual, then *2 players*. Bots join after 10 seconds.
+3. Double-click **`build-and-test.cmd`** to run all tests and build everything again. The result is in `build-log.txt`.
+4. Optional: install Visual Studio 2026 Community with the **.NET Multi-platform App UI** workload to get a debugger and Test Explorer.
+5. For PostgreSQL locally, see README → *Use PostgreSQL locally*. Migrations run automatically in Development.
+6. Optional end-to-end check: `cd tools\smoke`, then `npm install`, then `node smoke.mjs http://localhost:5080`.
 
 ## Where to read more
 - `README.md`: setup, run, test, build.

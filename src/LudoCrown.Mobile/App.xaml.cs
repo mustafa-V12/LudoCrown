@@ -12,7 +12,8 @@ public partial class App : Application
         _services = services;
         InitializeComponent();
         UserAppTheme = AppTheme.Dark; // the game is designed for a dark "night" table
-        AsyncCommand.UnhandledError = ex => System.Diagnostics.Debug.WriteLine($"[LudoCrown] Unhandled command error: {ex}");
+        DevLog.Install();
+        AsyncCommand.UnhandledError = ex => DevLog.Write($"Unhandled command error: {ex}");
     }
 
     protected override Window CreateWindow(IActivationState? activationState)

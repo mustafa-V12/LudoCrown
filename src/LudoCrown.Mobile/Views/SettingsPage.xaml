@@ -57,7 +57,7 @@
                         <Label Text="{Binding ServerUrl, StringFormat='Server: {0}'}" Style="{StaticResource Caption}" />
                         <Label Text="{Binding EnvironmentText}" Style="{StaticResource Caption}" />
                         <Button Text="Change server URL" Command="{Binding SetServerCommand}" Style="{StaticResource LinkButton}" HorizontalOptions="Start" />
-                        <Button Text="Add test gold, gems &amp; Shields (development server only)" Command="{Binding DevGrantCommand}" IsVisible="{Binding IsSignedIn}" Style="{StaticResource SecondaryButton}" />
+                        <Button Text="Add test currency (dev server only)" Command="{Binding DevGrantCommand}" IsVisible="{Binding IsSignedIn}" Style="{StaticResource SecondaryButton}" />
                     </VerticalStackLayout>
                 </Border>
 

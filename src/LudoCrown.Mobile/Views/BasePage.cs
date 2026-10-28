@@ -23,13 +23,21 @@ public class BasePage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-        if (ViewModel is not null) await ViewModel.OnAppearingAsync();
+        Services.DevLog.Write($"Appearing {GetType().Name}");
+        try { if (ViewModel is not null) await ViewModel.OnAppearingAsync(); }
+        catch (Exception ex)
+        {
+            // An escaped exception in async void would terminate the app; log it and keep running.
+            Services.DevLog.Write($"OnAppearing {GetType().Name} failed: {ex}");
+        }
     }
 
     protected override async void OnDisappearing()
     {
         base.OnDisappearing();
-        if (ViewModel is not null) await ViewModel.OnDisappearingAsync();
+        Services.DevLog.Write($"Disappearing {GetType().Name}");
+        try { if (ViewModel is not null) await ViewModel.OnDisappearingAsync(); }
+        catch (Exception ex) { Services.DevLog.Write($"OnDisappearing {GetType().Name} failed: {ex}"); }
     }
 }
 
@@ -40,7 +48,7 @@ public sealed class PageHeader : ContentView
     public static readonly BindableProperty ShowBackProperty = BindableProperty.Create(nameof(ShowBack), typeof(bool), typeof(PageHeader), true, propertyChanged: (b, _, n) => ((PageHeader)b)._back.IsVisible = (bool)n);
 
     private readonly Label _title = new() { FontSize = 20, FontAttributes = FontAttributes.Bold, VerticalOptions = LayoutOptions.Center, HorizontalOptions = LayoutOptions.Center };
-    private readonly Button _back = new() { Text = "‹ Back", Style = (Style)Application.Current!.Resources["LinkButton"], HorizontalOptions = LayoutOptions.Start };
+    private readonly Button _back = new() { Text = "‹ Back", Style = (Style)Microsoft.Maui.Controls.Application.Current!.Resources["LinkButton"], HorizontalOptions = LayoutOptions.Start };
 
     public PageHeader()
     {
