@@ -3,7 +3,9 @@
 ## What the server does
 - Accounts and sign-in: guest, Apple, Google, Facebook, email codes. It issues short-lived access tokens and rotating refresh tokens.
 - Profiles, statistics, match history, friends, blocks, reports, account deletion and data export.
-- Matchmaking, private tables, and **authoritative live matches** over SignalR (WebSockets).
+- Matchmaking (ranked and casual queues per game mode), private tables, and **authoritative live matches** over SignalR (WebSockets), with game modes, gem rerolls, Shield boosts and quick chat.
+- Store and economy: gold, gems and inventory; verified App Store purchases (see STORE.md); idempotent gold purchases; a full ledger.
+- League seasons, groups, promotion and demotion, and season rewards (see LEAGUE.md). Public player profiles with privacy settings.
 - Persists everything to PostgreSQL. Live match state is saved after every move for crash recovery.
 
 ## API
@@ -28,7 +30,13 @@
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/me` | Your profile, stats and coins |
+| GET | `/me` | Your profile, stats, coins and gems |
+| GET | `/me/gems` | Gem balance |
+| GET | `/me/inventory` | Gold, gems, items, equipped frame |
+| GET | `/me/ledger?limit=` | Your economy ledger (max 200) |
+| POST | `/me/frame` | `{frameId}`: equip a frame you own, or `null` to remove it |
+| GET / PATCH | `/me/privacy` | `{showStats?, showLeague?, chatEnabled?}` |
+| GET | `/me/stats/modes` | Classic and Quick statistics |
 | PATCH | `/me/profile` | `{displayName?, avatarId?}` |
 | GET | `/me/matches?limit=` | Match history |
 | GET | `/me/export` | Data download |
@@ -39,17 +47,52 @@
 | DELETE | `/friends/{id}` | Remove a friend |
 | GET / POST / DELETE | `/blocks[/{id}]` | List, block, unblock |
 | POST | `/reports` | `{userId, matchId?, reason, details?}` |
-| GET | `/players/{id}` | Public profile (hidden if either player blocked the other) |
+| GET | `/players/{publicId}` | Public profile by public player ID (friend code). Only public fields; stats and league hidden if the player chose so; unavailable if either player blocked the other. |
+| POST | `/players/{publicId}/block` | Block by public ID (from the board, results, league) |
+
+**Store** (authenticated):
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/store/catalog` | Products with contents, gold prices, App Store product IDs, which stores are enabled, environment |
+| GET | `/store/purchase-token` | The app account token to attach to App Store payments |
+| POST | `/store/purchases` | `{store: "app_store"\|"dev_sandbox", productId, transactionId}` → 200 `credited`/`already_credited`, 202 `pending`, 422 `rejected` |
+| POST | `/store/buy` | `{productId, requestId}`: buy with gold; idempotent per request ID |
+| POST | `/store/apple/notifications` | App Store Server Notifications V2 (JWS-verified; refunds and revocations) |
+
+**League** (authenticated):
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/league` | Season, clock, your division and standing, your group's table (at most 30), reward table and rules, last season's result |
+| GET | `/league/rewards` | The reward table and rules |
+
+**Development only.** These are mapped only when the environment is Development **and** `DevTools:AllowGemGrant=true`; the server logs a warning at startup when they are on:
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/dev/gems/grant` | `{amount}` (1–100) gems to yourself |
+| POST | `/dev/economy/grant` | `{coins, gems, shields}` to yourself (limits apply) |
+| POST | `/dev/league/end-season` | End the current season now and pay rewards |
 
 **Operations:**
 
 | Path | Purpose |
 |---|---|
 | `/health` | Includes a database check when PostgreSQL is configured |
+| `/info` | Environment, storage (in-memory or PostgreSQL), modes, reroll cost, and whether dev tools, the dev sandbox store, App Store verification, the league and chat are enabled |
 | `/stats/live` | Number of live matches and queue size |
 
 **Hub** `/hubs/match` (access token in the `access_token` query string):
-- **Client → server:** `FindMatch`, `CancelMatchmaking`, `CreatePrivateRoom`, `JoinPrivateRoom`, `StartPrivateRoom`, `LeaveRoom`, `Roll`, `Move`, `Resync`, `SendReaction`, `RequestRematch`
+- **Client → server:**
+  - `FindMatch(playerCount, mode, queue)`: `mode` is `classic` or `quick`; `queue` is `ranked` or `casual`
+  - `CancelMatchmaking`
+  - `CreatePrivateRoom(playerCount, mode)`, `JoinPrivateRoom`, `StartPrivateRoom`, `LeaveRoom`
+  - `Roll`, `Move`
+  - `Reroll(matchId, version, requestId)` → `RerollResult`
+  - `PassTurn(matchId, version)`: only for a held roll that has no legal move
+  - `UseBoost(matchId, version, requestId)` → `BoostResult`
+  - `Resync`, `SendReaction(matchId, phraseOrEmojiId)`, `RequestRematch`
 - **Server → client:** `MatchState`, `RoomUpdated`, `MatchmakingStatus`, `Reaction`, `MatchEnded`
 
 Names are defined once in `Core/Protocol/Protocol.cs` (`HubNames`).
@@ -76,7 +119,7 @@ All of these need **your** account, a payment method, and a domain with HTTPS.
 3. **Apply migrations** as the migrator role, in order:
 
    ```bash
-   psql "$MIGRATOR_URL" -v ON_ERROR_STOP=1 -f db/migrations/0001_initial_schema.sql
+   for f in db/migrations/0*.sql; do psql "$MIGRATOR_URL" -v ON_ERROR_STOP=1 -f "$f"; done
    ```
 
    Or set `Database__MigrateOnStartup=true` for the first deploy. Either way, migrations are recorded in `schema_migrations`.
@@ -87,7 +130,7 @@ All of these need **your** account, a payment method, and a domain with HTTPS.
    docker push <registry>/ludocrown-server:1.0.0
    ```
 
-5. **Configure environment variables / secrets** (see `deploy/.env.example`). At minimum:
+5. **Configure environment variables / secrets** (see `deploy/.env.example`). For purchases, also set the `Store__…` settings in STORE.md. At minimum:
    - `ConnectionStrings__Postgres` (as `ludocrown_app`, with `SSL Mode=Require`)
    - `Jwt__SigningKey`
    - `Auth__PublicBaseUrl`
@@ -96,7 +139,8 @@ All of these need **your** account, a payment method, and a domain with HTTPS.
 7. **Check that it works:**
    - `GET /health` → `Healthy`
    - `GET /auth/providers` shows the expected providers
-   - run `node tools/smoke/smoke.mjs https://api.your-domain.com`. This creates two guest accounts and plays a match. Delete them afterwards, or run it against staging only.
+   - `GET /info` shows `environment: Production`, `devGemGrant: false`, `devSandboxStore: false`, and `appStoreVerification: true` once the Apple keys are set
+   - `tools/smoke/smoke.mjs` needs dev tools, so run it against a **Development or staging** server only, never production.
 8. **Point the app at the server:** set `AppConfig.ProductionServerUrl` and rebuild the app.
 
 ## Scaling

@@ -220,8 +220,15 @@ public sealed class PurchaseService(
     }
 
     private static PurchaseRecord NewRecord(Guid userId, PurchaseClaim claim, string catalogId, PurchaseStatus status, PurchaseVerification v, DateTimeOffset now) =>
-        new(Guid.NewGuid(), userId, claim.Store, catalogId, claim.TransactionId, v.OriginalTransactionId, v.Environment, status, Math.Max(1, v.Quantity),
+        new(Guid.NewGuid(), userId, claim.Store, catalogId, claim.TransactionId, v.OriginalTransactionId, EnvironmentFor(claim.Store, v), status, Math.Max(1, v.Quantity),
             status is PurchaseStatus.Rejected or PurchaseStatus.Pending ? v.Reason : null, v.PurchasedAt, now);
+
+    /// <summary>
+    /// Sandbox transactions are always "development". For App Store claims that could not be verified (pending/rejected), the
+    /// store has not told us its environment yet, so they are recorded as "production" until a verification says otherwise.
+    /// </summary>
+    private static string EnvironmentFor(string store, PurchaseVerification v) =>
+        store == PurchaseStores.DevSandbox ? "development" : v.Status == VerificationStatus.Verified ? v.Environment : "production";
 
     private static PurchaseProcessResult Fail(PurchaseOutcome o, string message) => new(o, message, null, Array.Empty<AssetChange>());
 }

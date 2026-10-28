@@ -53,7 +53,19 @@ External services always sit behind interfaces: `IAuthBrowser`, `IAppleSignIn`, 
 4. **One command at a time** per match (`SemaphoreSlim`), so there are no races between players or timers.
 5. **Results and rewards** are computed in `MatchService.CompleteAsync` and written in one transaction by `IMatchStore.CompleteMatchAsync`. The transaction is idempotent: the match row is locked and its status checked, and a unique ledger key prevents paying a match out twice. Clients have no API that writes stats, XP or coins.
 6. **Rate limits:** a per-connection token bucket on the hub (10 calls/s, burst 20), fixed-window limits on REST (30/min per IP on `/auth`, 120/min per user elsewhere), and reactions limited to one per 2 seconds.
-7. **Reactions are preset IDs**, validated by the server. There is no free text to abuse.
+7. **Quick chat is preset IDs**, validated by the server. There is no free text to abuse. Limits: 6 messages per 20 s, at least 1.5 s apart. Blocks are respected, and players can turn chat off.
+8. **Economy writes are server-only.** Rerolls, boosts, gold buys, purchases and rewards each run as one atomic economy operation with an idempotency key:
+   - The reroll key is `reroll:{match}:{requestId}`. The boost and gold-buy keys follow the same pattern.
+   - A retried request returns the original result and is not applied again.
+   - Balances can't go negative (CHECK constraints plus conditional updates).
+   - Purchases are credited only after the App Store Server API confirms them. One store transaction is credited once, to one account.
+9. **Mode, queue and boosts are fixed at match start.** The server enforces the win condition (`RuleSet.PiecesToWin`), the reroll limit (`RuleSet.MaxRerolls`) and the boost allowance (0 in ranked matches).
+
+## Economy, league and profiles
+- `Server/Store`: catalog, `PurchaseService`, and verifiers (`AppStoreVerifier`, plus `DevSandboxVerifier` in Development only). `Server.Data/IEconomyStore` applies operations atomically. PostgreSQL implements this in `PostgresStore.Economy.cs`.
+- `Server/League`: `LeagueRules` holds the numbers. `LeagueService` handles seasons, groups, points from recorded results, and idempotent finalization. `LeagueHostedService` rolls seasons over.
+- Public profiles are looked up by the public player code (friend code). Internal account IDs never leave the server in other players' views (`SeatInfo.PublicId`).
+- The app's store, league and profile screens are view models in `App.Logic`, so they are tested without MAUI. On iOS, StoreKit sits behind `IInAppPurchaseService`.
 
 ## Synchronisation and reconnection
 - After every change the server pushes each player a personal snapshot: the full state, their seat, their legal pieces, the turn deadline, and the events that caused the change.

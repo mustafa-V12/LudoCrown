@@ -2,7 +2,14 @@
 
 A polished, social Ludo game for iPhone, built with **.NET MAUI (C#)**, an **authoritative ASP.NET Core + SignalR game server**, and **PostgreSQL**.
 
-- Online matchmaking (2 or 4 players), with bots filling empty seats after a short wait
+- Two game modes: **Classic** (all 4 pieces home) and **Quick** (first piece home wins), online and offline
+- Online matchmaking (2 or 4 players) in **ranked** (league) and **casual** queues, with bots filling empty seats after a short wait
+- **Gem rerolls** (7 per Classic match, 5 per Quick), validated and charged by the server
+- **Store:** gold, gems, Shield bottles and cosmetic frames. Apple in-app purchases are verified by the server, and a development sandbox lets you test without Apple.
+- **Shield bottle** boost, in casual matches and private tables only
+- **Quick chat** with preset phrases and emoji, plus mute, block and an off switch
+- **League:** 14-day seasons, six original divisions (Squire to Monarch), groups, promotion and demotion, fixed season rewards
+- **Public player profiles** with Classic and Quick stats, plus privacy settings
 - Private tables with a 6-character code or a `ludocrown://join/CODE` invite link, plus rematch
 - Offline play against Easy / Normal / Hard computer opponents, or pass-and-play on one phone; saved games resume automatically
 - Sign in with Apple, Google, Facebook, or passwordless email, plus a guest mode you can upgrade later
@@ -90,6 +97,22 @@ Debug builds connect to `http://localhost:5080` (the Android emulator uses `http
 
 Sign in with Apple only works once the capability is enabled. See [docs/AUTH_SETUP.md](docs/AUTH_SETUP.md).
 
+### Local development environment (client + server + PostgreSQL)
+
+The three run modes are kept clearly apart. The app shows which one you're in: a line under the home screen title, and Settings → Development.
+
+| Mode | What runs | Data |
+|---|---|---|
+| **Offline** | Only the app. Bots and pass-and-play on this device. | Saved on the device. No gems, rerolls, boosts or league. |
+| **Local development** | The app (Debug) plus the server in Development, optionally with your local PostgreSQL | Dev tools are on: test gold/gems/Shields in Settings → Development, the store sandbox, and ending a league season early. Labelled "Development". |
+| **Production** | A Release app plus your deployed server | Real accounts, real purchases. Dev tools don't exist there. |
+
+- If the server or database can't be reached, the app says so ("Couldn't reach the server…"). It **never** silently switches online play to a local or fake match. Offline play is always a separate, explicit choice.
+- A typical local setup: start PostgreSQL (Docker or your own install, below), run **LudoCrown.Server** (F5), then run **LudoCrown.Mobile** on Windows Machine.
+  - Sign in as a guest, then use Settings → Development → *Add test gold, gems & Shields*.
+  - Play a ranked or casual match against the bots, try the store sandbox, and open the league.
+- An automated end-to-end check is in `tools/smoke`: `npm install`, then `node smoke.mjs http://localhost:5080`.
+
 ### Use PostgreSQL locally
 
 **With Docker:**
@@ -124,7 +147,10 @@ Server settings live in `src/LudoCrown.Server/appsettings.json`, which contains 
 | `Jwt:SigningKey` | Base64 key of at least 32 bytes for access tokens. **Required outside Development.** |
 | `Auth:PublicBaseUrl` | The server's public HTTPS URL, used for Google and Facebook OAuth redirects |
 | `Auth:Apple:*`, `Auth:Google:*`, `Auth:Facebook:*`, `Auth:Email:*` | Sign-in providers. Each provider is enabled only when it is configured; the app hides buttons for disabled providers. |
-| `Match:*` | Turn timer (20 s), disconnect grace period (90 s), missed-turn limit (3), bot fill wait (30 s) |
+| `Match:*` | Turn timer (20 s), disconnect grace period (90 s), missed-turn limit (3), bot fill wait (30 s), held-roll window (5 s), `ChatEnabled` |
+| `Store:*` | App Store product ID prefix and App Store Server API keys (see [docs/STORE.md](docs/STORE.md)). `Store:DevSandbox` works in Development only. |
+| `League:*` | `Enabled`, `SeasonDays` (see [docs/LEAGUE.md](docs/LEAGUE.md)) |
+| `DevTools:AllowGemGrant` | Development only: enables the `/dev/*` endpoints (test currency, ending a season). Ignored in other environments. |
 | `Database:MigrateOnStartup`, `Database:MatchRetentionDays` | Migration and retention behaviour |
 
 App settings that you must change before release are marked `TODO before release` in `src/LudoCrown.App.Logic/Services/PlatformServices.cs` (`AppConfig`) and in `src/LudoCrown.Mobile/LudoCrown.Mobile.csproj` (`ApplicationId`).
@@ -201,5 +227,6 @@ These tools exist because the environment that generated this project could not 
 - Sounds play on iOS only. Android and Windows builds are silent.
 - Google and Facebook sign-in use the system browser sheet, which isn't available on Windows desktop builds. Windows shows only guest, email and offline play.
 - The server holds live matches in memory on a single instance. Running several instances needs sticky routing plus a SignalR backplane (see [docs/BACKEND.md](docs/BACKEND.md)).
-- No in-app purchases, ads, tracking, voice chat or free-text chat. Coins are earned through play only and can't be spent yet.
+- **In-app purchases have not been tested with Apple.** The products don't exist yet in App Store Connect, product IDs are placeholders, and the StoreKit code has not been compiled. The server flow is tested with fakes and the development sandbox. See [docs/STORE.md](docs/STORE.md).
+- No ads, tracking, voice chat or free-text chat.
 - Reports from players are stored in the database. There is no moderation dashboard yet; review them with SQL (see [docs/DATABASE.md](docs/DATABASE.md)).

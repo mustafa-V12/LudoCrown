@@ -303,6 +303,45 @@ public class AppStoreVerifierTests
     private static HttpResponseMessage Ok(string signed) => new(HttpStatusCode.OK) { Content = new StringContent(JsonSerializer.Serialize(new { signedTransactionInfo = signed })) };
 
     [Fact]
+    public async Task Refund_notification_marks_the_purchase_and_claws_back_without_going_negative()
+    {
+        var chain = MakeChain();
+        var h = new ServerHarness();
+        var u = await h.NewUserAsync();
+        var (apple, _) = Make(chain, _ => Ok(Sign(chain, Tx(token: AppAccountTokens.For(u)))));
+        h.Verifiers.Add(apple);
+
+        var credited = await h.Purchases.ProcessAsync(u, new PurchaseClaim(PurchaseStores.AppStore, "PLACEHOLDER.BUNDLE.ID.gems_small", "2000000123"));
+        Assert.Equal(PurchaseOutcome.Credited, credited.Outcome);
+        Assert.Equal(Economy.StarterGems + 50, await h.Store.GetGemsAsync(u));
+
+        // The player spends most of the gems before the refund arrives.
+        Assert.True((await h.Store.SpendGemsAsync(u, null, "spend-before-refund", 55, Economy.Reasons.Reroll, DateTimeOffset.UtcNow)).Charged);
+        var left = await h.Store.GetGemsAsync(u);
+
+        var notification = Sign(chain, new { notificationType = "REFUND", data = new { signedTransactionInfo = Sign(chain, Tx(token: AppAccountTokens.For(u))) } });
+        Assert.True(await h.Purchases.HandleAppStoreNotificationAsync(notification));
+        Assert.True(await h.Purchases.HandleAppStoreNotificationAsync(notification)); // redelivered: no second clawback
+
+        Assert.Equal(PurchaseStatus.Refunded, (await h.Store.GetPurchaseAsync(PurchaseStores.AppStore, "2000000123"))!.Status);
+        Assert.Equal(0, await h.Store.GetGemsAsync(u));
+        Assert.Single(h.Store.Ledger, l => l.User == u && l.Entry.Reason == Economy.Reasons.Refund && l.Entry.Delta == -left);
+        Assert.Equal(PurchaseOutcome.Rejected, (await h.Purchases.ProcessAsync(u, new PurchaseClaim(PurchaseStores.AppStore, "PLACEHOLDER.BUNDLE.ID.gems_small", "2000000123"))).Outcome);
+    }
+
+    [Fact]
+    public async Task Notifications_with_an_untrusted_signature_are_ignored()
+    {
+        var trusted = MakeChain();
+        var forged = MakeChain();
+        var h = new ServerHarness();
+        var (apple, _) = Make(trusted, _ => new HttpResponseMessage(HttpStatusCode.NotFound));
+        h.Verifiers.Add(apple);
+        var fake = Sign(forged, new { notificationType = "REFUND", data = new { signedTransactionInfo = Sign(forged, Tx()) } });
+        Assert.False(await h.Purchases.HandleAppStoreNotificationAsync(fake));
+    }
+
+    [Fact]
     public async Task Valid_signed_transaction_is_verified()
     {
         var chain = MakeChain();

@@ -44,7 +44,13 @@ public sealed class MatchmakingService(MatchService matches, ISocialStore social
         lock (_gate)
         {
             if (!_tickets.Any(t => t.UserId == userId))
-                return (new MatchmakingStatus(MatchmakingState.Matched, playerCount, playerCount, matches.ActiveMatchFor(userId)?.ToString("N"), null, mode, queue), null);
+            {
+                // Grouped. If another caller (or the background tick) is still starting the match, the id is not known yet:
+                // report "starting" and let the Matched push that follows carry the id. Never report Matched without one.
+                return matches.ActiveMatchFor(userId) is Guid started
+                    ? (new MatchmakingStatus(MatchmakingState.Matched, playerCount, playerCount, started.ToString("N"), null, mode, queue), null)
+                    : (new MatchmakingStatus(MatchmakingState.Searching, playerCount, playerCount, null, "Starting match…", mode, queue), null);
+            }
             found = _tickets.Count(t => t.PlayerCount == playerCount && t.Mode == mode && t.Queue == queue);
         }
         var status = new MatchmakingStatus(MatchmakingState.Searching, playerCount, Math.Min(found, playerCount), null, null, mode, queue);
