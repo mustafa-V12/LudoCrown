@@ -16,6 +16,7 @@ public partial class ResultsPage : BasePage
         Crown.Scale = 0.6;
         Crown.Rotation = -8;
         if (vm.Won) Confetti.Burst();
+        Services.DevShots.Capture(vm.Won ? "victory" : "results", 900);
         await Task.WhenAll(Crown.ScaleTo(1, 450, Easing.SpringOut), Crown.RotateTo(0, 450, Easing.SpringOut));
     }
 

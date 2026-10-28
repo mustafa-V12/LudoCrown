@@ -67,8 +67,13 @@ public partial class GamePage : BasePage
         return true;
     }
 
+    private int _shotTurns;
+
     private void OnBoardChanged(BoardState? previous, BoardState next)
     {
+        // Development screenshots: a few moments of the match (start, when you can roll, mid-game).
+        if (Services.DevShots.Enabled && next.CanRoll && previous?.CanRoll != true && _shotTurns++ is 0 or 3 or 8)
+            Services.DevShots.Capture($"game-turn{_shotTurns}", 400);
         Board.SetState(previous, next);
         EnsureCorners(next);
         var piecesToWin = next.ModeInfo.PiecesToWin;

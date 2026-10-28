@@ -16,7 +16,8 @@ echo Update started %date% %time% > "%LOG%"
 if exist "%ProgramFiles%\Git\cmd\git.exe" set "PATH=%ProgramFiles%\Git\cmd;%PATH%"
 if not exist LudoCrown.bundle ( echo NO-BUNDLE >> "%LOG%" & echo No LudoCrown.bundle found. & goto end )
 
-for /f %%c in ('git status --porcelain --untracked-files=no ^| find /c /v ""') do set CHANGES=%%c
+rem Changes to the helper scripts in tools\windows are ignored here (Claude may deliver a newer copy of this script).
+for /f %%c in ('git status --porcelain --untracked-files^=no -- . ":(exclude)tools/windows" ^| find /c /v ""') do set CHANGES=%%c
 if not "%CHANGES%"=="0" (
   echo LOCAL-CHANGES >> "%LOG%"
   git status --short >> "%LOG%"
@@ -41,7 +42,8 @@ call "%TOOLS%build-windows-app.cmd"
 findstr /c:"EXITCODE windows-app 0" "%TOOLS%app-build-log.txt" >nul
 if errorlevel 1 ( echo BUILD-FAILED >> "%LOG%" & echo Build failed. See tools\windows\app-build-log.txt & goto end )
 echo BUILD-OK >> "%LOG%"
-call "%TOOLS%run-dev.cmd"
+rem Start in screenshot mode: the app saves a PNG of each screen to tools\windows\shots (development only).
+call "%TOOLS%screenshots.cmd"
 
 :end
 echo UPDATE-SCRIPT-DONE %date% %time% >> "%LOG%"

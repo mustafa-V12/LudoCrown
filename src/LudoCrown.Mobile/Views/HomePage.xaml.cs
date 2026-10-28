@@ -20,6 +20,7 @@ public partial class HomePage : BasePage
     {
         _players = players;
         ModeTitle.Text = $"{players} Players";
+        ModeOverlay.StyleId = "mode-panel";
         PrivateOverlay.IsVisible = false;
         ShowOverlay(ModeOverlay);
     }
@@ -27,6 +28,7 @@ public partial class HomePage : BasePage
     private void OnPrivateTable(object? sender, EventArgs e)
     {
         ModeOverlay.IsVisible = false;
+        PrivateOverlay.StyleId = "private-panel";
         ShowOverlay(PrivateOverlay);
     }
 
@@ -36,6 +38,7 @@ public partial class HomePage : BasePage
         overlay.Scale = 0.94;
         overlay.IsVisible = true;
         await Task.WhenAll(overlay.FadeTo(1, 140), overlay.ScaleTo(1, 180, Easing.CubicOut));
+        Services.DevShots.Capture(overlay.StyleId ?? "panel", 500);
     }
 
     private void OnCloseOverlay(object? sender, EventArgs e)

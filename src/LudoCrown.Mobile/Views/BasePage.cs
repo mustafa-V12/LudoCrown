@@ -24,6 +24,7 @@ public class BasePage : ContentPage
     {
         base.OnAppearing();
         Services.DevLog.Write($"Appearing {GetType().Name}");
+        Services.DevShots.Capture(GetType().Name.Replace("Page", "").ToLowerInvariant(), 1500);
         try { if (ViewModel is not null) await ViewModel.OnAppearingAsync(); }
         catch (Exception ex)
         {

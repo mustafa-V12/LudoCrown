@@ -17,3 +17,4 @@ node_modules/
 tools/windows/*.txt
 *.bundle
 web/dist/
+tools/windows/shots/

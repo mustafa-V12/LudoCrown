@@ -19,6 +19,11 @@ public partial class App : Application
     protected override Window CreateWindow(IActivationState? activationState)
     {
         var window = new Window(_services.GetRequiredService<AppShell>()) { Title = "Ludo Crown" };
+#if WINDOWS
+        // Phone-shaped window on Windows, so the desktop build looks like the iPhone app (and screenshots match).
+        window.Width = 430;
+        window.Height = 900;
+#endif
         // Reconnect to the game server when the app comes back to the foreground.
         window.Resumed += async (_, _) =>
         {
