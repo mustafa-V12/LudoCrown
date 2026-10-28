@@ -5,7 +5,9 @@ rem no password is stored in this script. Log: tools\windows\publish-log.txt
 setlocal
 cd /d "%~dp0\..\.."
 set "LOG=%~dp0publish-log.txt"
-set "REMOTE=https://github.com/mustafa-V12/LudoCrown.git"
+rem The user name in the URL makes Git Credential Manager use (or ask for) the mustafa-V12 account, even if
+rem Windows has saved a sign-in for another GitHub account.
+set "REMOTE=https://mustafa-V12@github.com/mustafa-V12/LudoCrown.git"
 echo Publish started %date% %time% > "%LOG%"
 
 if exist "%ProgramFiles%\Git\cmd\git.exe" set "PATH=%ProgramFiles%\Git\cmd;%PATH%"
@@ -37,15 +39,20 @@ if exist LudoCrown.bundle (
   git update-ref -d refs/remotes/bundle/main
 )
 
+rem Earlier copy of the CI workflow (the real one is .github\workflows\ci.yml, now restored by git).
+if exist .github\workflows\ci.yml if exist deploy\github-ci.yml del deploy\github-ci.yml
+
 git remote remove origin >nul 2>&1
 git remote add origin %REMOTE%
 echo.
 echo Pushing to %REMOTE% ...
-echo If a GitHub sign-in window opens, sign in as mustafa-V12.
+echo A GitHub sign-in window will open: choose "Sign in with your browser" and sign in as mustafa-V12.
+echo (If the browser is signed in to another GitHub account, switch to mustafa-V12 first.)
 git push -u origin main >> "%LOG%" 2>&1
 if errorlevel 1 (
   echo PUSH-FAILED >> "%LOG%"
   echo Push failed. See %LOG%
+  type "%LOG%" | findstr /i "remote: fatal: error:"
   goto end
 )
 echo PUSH-OK >> "%LOG%"
